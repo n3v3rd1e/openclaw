@@ -1,7 +1,17 @@
+export type ChatAttachmentKind = "image" | "voice-note";
+
 export type ChatAttachment = {
   id: string;
+  kind?: ChatAttachmentKind;
   dataUrl: string;
+  previewUrl?: string;
   mimeType: string;
+  fileName?: string;
+  source?: "upload" | "record";
+  durationMs?: number;
+  transcript?: string;
+  transcriptParts?: string[];
+  persistedNoteId?: string;
 };
 
 export type ChatQueueItem = {

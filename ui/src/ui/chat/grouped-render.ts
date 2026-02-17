@@ -18,6 +18,12 @@ type ImageBlock = {
   alt?: string;
 };
 
+type VoiceNoteBlock = {
+  url: string;
+  fileName?: string;
+  transcript?: string;
+};
+
 function extractImages(message: unknown): ImageBlock[] {
   const m = message as Record<string, unknown>;
   const content = m.content;
@@ -53,6 +59,64 @@ function extractImages(message: unknown): ImageBlock[] {
   }
 
   return images;
+}
+
+function extractVoiceNotes(message: unknown): VoiceNoteBlock[] {
+  const m = message as Record<string, unknown>;
+  const content = m.content;
+  const notes: VoiceNoteBlock[] = [];
+
+  if (!Array.isArray(content)) {
+    return notes;
+  }
+
+  for (const block of content) {
+    if (typeof block !== "object" || block === null) {
+      continue;
+    }
+    const b = block as Record<string, unknown>;
+    const type = typeof b.type === "string" ? b.type.toLowerCase() : "";
+    if (type !== "voice_note" && type !== "audio") {
+      continue;
+    }
+
+    let url: string | null = null;
+    if (typeof b.url === "string") {
+      url = b.url;
+    } else {
+      const source = b.source as Record<string, unknown> | undefined;
+      if (source?.type === "base64" && typeof source.data === "string") {
+        const mediaType =
+          (typeof source.media_type === "string" && source.media_type) ||
+          (typeof b.mimeType === "string" && b.mimeType) ||
+          "audio/ogg";
+        const data = source.data;
+        url = data.startsWith("data:") ? data : `data:${mediaType};base64,${data}`;
+      }
+    }
+
+    if (!url) {
+      continue;
+    }
+
+    const transcript =
+      typeof b.transcript === "string"
+        ? b.transcript.trim()
+        : Array.isArray(b.transcriptParts)
+          ? b.transcriptParts
+              .map((part) => (typeof part === "string" ? part.trim() : ""))
+              .filter(Boolean)
+              .join("\n")
+          : "";
+
+    notes.push({
+      url,
+      fileName: typeof b.fileName === "string" ? b.fileName : undefined,
+      transcript: transcript || undefined,
+    });
+  }
+
+  return notes;
 }
 
 export function renderReadingIndicatorGroup(assistant?: AssistantIdentity) {
@@ -216,6 +280,35 @@ function renderMessageImages(images: ImageBlock[]) {
   `;
 }
 
+function renderVoiceNotes(notes: VoiceNoteBlock[]) {
+  if (notes.length === 0) {
+    return nothing;
+  }
+
+  return html`
+    <div class="chat-message-voice-notes">
+      ${notes.map(
+        (note, index) => html`
+          <div class="chat-message-voice-note">
+            <div class="chat-message-voice-note__title">${note.fileName ?? `Voice note ${index + 1}`}</div>
+            <audio controls preload="metadata" src=${note.url}></audio>
+            ${
+              note.transcript
+                ? html`
+                  <details class="chat-message-voice-note__drawer">
+                    <summary>Transcript</summary>
+                    <div class="chat-message-voice-note__transcript">${note.transcript}</div>
+                  </details>
+                `
+                : nothing
+            }
+          </div>
+        `,
+      )}
+    </div>
+  `;
+}
+
 function renderGroupedMessage(
   message: unknown,
   opts: { isStreaming: boolean; showReasoning: boolean },
@@ -234,6 +327,8 @@ function renderGroupedMessage(
   const hasToolCards = toolCards.length > 0;
   const images = extractImages(message);
   const hasImages = images.length > 0;
+  const voiceNotes = extractVoiceNotes(message);
+  const hasVoiceNotes = voiceNotes.length > 0;
 
   const extractedText = extractTextCached(message);
   const extractedThinking =
@@ -256,7 +351,7 @@ function renderGroupedMessage(
     return html`${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar))}`;
   }
 
-  if (!markdown && !hasToolCards && !hasImages) {
+  if (!markdown && !hasToolCards && !hasImages && !hasVoiceNotes) {
     return nothing;
   }
 
@@ -264,6 +359,7 @@ function renderGroupedMessage(
     <div class="${bubbleClasses}">
       ${canCopyMarkdown ? renderCopyAsMarkdownButton(markdown!) : nothing}
       ${renderMessageImages(images)}
+      ${renderVoiceNotes(voiceNotes)}
       ${
         reasoningMarkdown
           ? html`<div class="chat-thinking">${unsafeHTML(

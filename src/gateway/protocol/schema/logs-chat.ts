@@ -61,6 +61,25 @@ export const ChatInjectParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 
+export const VoiceNotesSaveParamsSchema = Type.Object(
+  {
+    sessionKey: Type.Optional(NonEmptyString),
+    source: Type.Optional(Type.Union([Type.Literal("upload"), Type.Literal("record")])),
+    durationMs: Type.Optional(Type.Integer({ minimum: 1, maximum: 60 * 60 * 1000 })),
+    transcript: Type.Optional(Type.String()),
+    transcriptParts: Type.Optional(Type.Array(Type.String())),
+    audio: Type.Object(
+      {
+        mimeType: Type.Optional(Type.String()),
+        fileName: Type.Optional(Type.String()),
+        content: NonEmptyString,
+      },
+      { additionalProperties: false },
+    ),
+  },
+  { additionalProperties: false },
+);
+
 export const ChatEventSchema = Type.Object(
   {
     runId: NonEmptyString,

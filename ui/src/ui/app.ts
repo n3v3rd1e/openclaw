@@ -17,7 +17,11 @@ import {
 import {
   handleAbortChat as handleAbortChatInternal,
   handleSendChat as handleSendChatInternal,
+  handleToggleVoiceNoteRecording as handleToggleVoiceNoteRecordingInternal,
   removeQueuedMessage as removeQueuedMessageInternal,
+  setChatAttachments as setChatAttachmentsInternal,
+  setChatDraft as setChatDraftInternal,
+  clearChatRecordError as clearChatRecordErrorInternal,
 } from "./app-chat.ts";
 import { DEFAULT_CRON_FORM, DEFAULT_LOG_LEVEL_FILTERS } from "./app-defaults.ts";
 import type { EventLogEntry } from "./app-events.ts";
@@ -144,6 +148,8 @@ export class OpenClawApp extends LitElement {
   @state() chatThinkingLevel: string | null = null;
   @state() chatQueue: ChatQueueItem[] = [];
   @state() chatAttachments: ChatAttachment[] = [];
+  @state() chatRecording = false;
+  @state() chatRecordError: string | null = null;
   @state() chatManualRefreshInFlight = false;
   // Sidebar state for tool output viewing
   @state() sidebarOpen = false;
@@ -447,6 +453,29 @@ export class OpenClawApp extends LitElement {
     removeQueuedMessageInternal(
       this as unknown as Parameters<typeof removeQueuedMessageInternal>[0],
       id,
+    );
+  }
+
+  setChatDraft(next: string) {
+    setChatDraftInternal(this as unknown as Parameters<typeof setChatDraftInternal>[0], next);
+  }
+
+  setChatAttachments(next: ChatAttachment[]) {
+    setChatAttachmentsInternal(
+      this as unknown as Parameters<typeof setChatAttachmentsInternal>[0],
+      next,
+    );
+  }
+
+  clearChatRecordError() {
+    clearChatRecordErrorInternal(
+      this as unknown as Parameters<typeof clearChatRecordErrorInternal>[0],
+    );
+  }
+
+  async handleToggleVoiceNoteRecording() {
+    await handleToggleVoiceNoteRecordingInternal(
+      this as unknown as Parameters<typeof handleToggleVoiceNoteRecordingInternal>[0],
     );
   }
 

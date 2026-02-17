@@ -3,7 +3,14 @@ import { scheduleChatScroll } from "./app-scroll.ts";
 import { setLastActiveSessionKey } from "./app-settings.ts";
 import { resetToolStream } from "./app-tool-stream.ts";
 import type { OpenClawApp } from "./app.ts";
-import { abortChatRun, loadChatHistory, sendChatMessage } from "./controllers/chat.ts";
+import {
+  abortChatRun,
+  appendLocalVoiceNoteMessage,
+  loadChatHistory,
+  persistVoiceNoteAttachment,
+  sendChatMessage,
+  syncChatComposerLocalState,
+} from "./controllers/chat.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import type { GatewayHelloOk } from "./gateway.ts";
 import { normalizeBasePath } from "./navigation.ts";
@@ -11,12 +18,17 @@ import type { ChatAttachment, ChatQueueItem } from "./ui-types.ts";
 import { generateUUID } from "./uuid.ts";
 
 export type ChatHost = {
+  client: OpenClawApp["client"];
   connected: boolean;
+  lastError: string | null;
   chatMessage: string;
   chatAttachments: ChatAttachment[];
+  chatMessages: unknown[];
   chatQueue: ChatQueueItem[];
   chatRunId: string | null;
   chatSending: boolean;
+  chatRecording: boolean;
+  chatRecordError: string | null;
   sessionKey: string;
   basePath: string;
   hello: GatewayHelloOk | null;
@@ -25,6 +37,24 @@ export type ChatHost = {
 };
 
 export const CHAT_SESSIONS_ACTIVE_MINUTES = 120;
+const RECORDER_MIME_CANDIDATES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/ogg;codecs=opus",
+  "audio/ogg",
+  "audio/mp4",
+] as const;
+
+type ActiveVoiceRecorder = {
+  recorder: MediaRecorder;
+  stream: MediaStream;
+  chunks: BlobPart[];
+  startedAt: number;
+  mimeType: string;
+  stopping: boolean;
+};
+
+const activeVoiceRecorders = new WeakMap<ChatHost, ActiveVoiceRecorder>();
 
 export function isChatBusy(host: ChatHost) {
   return host.chatSending || Boolean(host.chatRunId);
@@ -60,11 +90,241 @@ function isChatResetCommand(text: string) {
   return normalized.startsWith("/new ") || normalized.startsWith("/reset ");
 }
 
+function pickRecorderMimeType(): string {
+  if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
+    return "";
+  }
+  for (const candidate of RECORDER_MIME_CANDIDATES) {
+    if (MediaRecorder.isTypeSupported(candidate)) {
+      return candidate;
+    }
+  }
+  return "";
+}
+
+function resolveVoiceNoteExtension(mimeType: string): string {
+  const normalized = mimeType.toLowerCase();
+  if (normalized.includes("ogg")) {
+    return "ogg";
+  }
+  if (normalized.includes("mp4") || normalized.includes("m4a")) {
+    return "m4a";
+  }
+  if (normalized.includes("mpeg") || normalized.includes("mp3")) {
+    return "mp3";
+  }
+  return "webm";
+}
+
+function readBlobAsDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      resolve(reader.result as string);
+    });
+    reader.addEventListener("error", () => {
+      reject(new Error("failed to read voice note recording"));
+    });
+    reader.readAsDataURL(blob);
+  });
+}
+
+function stopMediaStream(stream: MediaStream): void {
+  for (const track of stream.getTracks()) {
+    track.stop();
+  }
+}
+
+function resolveMicPermissionError(err: unknown): string | null {
+  if (!(err instanceof DOMException)) {
+    return null;
+  }
+  if (
+    err.name === "NotAllowedError" ||
+    err.name === "PermissionDeniedError" ||
+    err.name === "SecurityError"
+  ) {
+    return "Microphone access denied. Allow mic permissions and try recording again.";
+  }
+  return null;
+}
+
+function buildVoiceNoteFileName(now: number, mimeType: string): string {
+  const iso = new Date(now).toISOString().replace(/[^\d]/g, "").slice(0, 14);
+  return `voice-note-${iso}.${resolveVoiceNoteExtension(mimeType)}`;
+}
+
+function buildVoiceNoteBlob(params: {
+  recorder: MediaRecorder;
+  chunks: BlobPart[];
+  mimeType: string;
+}) {
+  const type = params.recorder.mimeType || params.mimeType || "audio/webm";
+  return new Blob(params.chunks, { type });
+}
+
+export function setChatDraft(host: ChatHost, next: string) {
+  host.chatMessage = next;
+  syncChatComposerLocalState(host as unknown as OpenClawApp);
+}
+
+export function setChatAttachments(host: ChatHost, next: ChatAttachment[]) {
+  host.chatAttachments = next;
+  syncChatComposerLocalState(host as unknown as OpenClawApp);
+}
+
+export function clearChatRecordError(host: ChatHost) {
+  host.chatRecordError = null;
+}
+
+async function startVoiceNoteRecording(host: ChatHost) {
+  if (!host.connected) {
+    return;
+  }
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    host.chatRecordError = "Microphone recording is not supported in this browser.";
+    return;
+  }
+  if (typeof MediaRecorder === "undefined") {
+    host.chatRecordError = "Microphone recording is not supported in this browser.";
+    return;
+  }
+
+  host.chatRecordError = null;
+  let stream: MediaStream | null = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = pickRecorderMimeType();
+    const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    const chunks: BlobPart[] = [];
+
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data && event.data.size > 0) {
+        chunks.push(event.data);
+      }
+    });
+    recorder.start(250);
+
+    activeVoiceRecorders.set(host, {
+      recorder,
+      stream,
+      chunks,
+      startedAt: Date.now(),
+      mimeType: recorder.mimeType || mimeType || "audio/webm",
+      stopping: false,
+    });
+    host.chatRecording = true;
+  } catch (err) {
+    if (stream) {
+      stopMediaStream(stream);
+    }
+    host.chatRecording = false;
+    host.chatRecordError =
+      resolveMicPermissionError(err) ?? `Unable to start recording: ${String(err)}`;
+  }
+}
+
+async function stopVoiceNoteRecording(host: ChatHost) {
+  const active = activeVoiceRecorders.get(host);
+  if (!active) {
+    host.chatRecording = false;
+    return;
+  }
+  if (active.stopping) {
+    return;
+  }
+
+  active.stopping = true;
+  try {
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      const handleStop = () => {
+        resolve(buildVoiceNoteBlob(active));
+      };
+      const handleError = (event: Event) => {
+        const recordingError = (event as ErrorEvent).error;
+        reject(
+          recordingError instanceof Error
+            ? recordingError
+            : new Error("voice note recording failed"),
+        );
+      };
+      active.recorder.addEventListener("stop", handleStop, { once: true });
+      active.recorder.addEventListener("error", handleError as EventListener, { once: true });
+
+      try {
+        if (active.recorder.state === "inactive") {
+          handleStop();
+          return;
+        }
+        active.recorder.stop();
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    });
+
+    if (blob.size === 0) {
+      throw new Error("voice note recording was empty");
+    }
+
+    const now = Date.now();
+    const mimeType = blob.type || active.mimeType || "audio/webm";
+    const dataUrl = await readBlobAsDataUrl(blob);
+    const previewUrl = URL.createObjectURL(blob);
+    const attachment: ChatAttachment = {
+      id: generateUUID(),
+      kind: "voice-note",
+      dataUrl,
+      previewUrl,
+      mimeType,
+      fileName: buildVoiceNoteFileName(now, mimeType),
+      source: "record",
+      durationMs: Math.max(0, now - active.startedAt),
+    };
+
+    host.chatAttachments = [...host.chatAttachments, attachment];
+    appendLocalVoiceNoteMessage(host as unknown as OpenClawApp, attachment, { timestamp: now });
+    syncChatComposerLocalState(host as unknown as OpenClawApp);
+
+    try {
+      const persistedId = await persistVoiceNoteAttachment(
+        host as unknown as OpenClawApp,
+        attachment,
+      );
+      if (!persistedId) {
+        host.chatRecordError =
+          "Voice note saved locally, but gateway persistence did not complete.";
+      }
+    } catch (err) {
+      console.warn("[control-ui] voice note persist failed:", err);
+      host.chatRecordError = `Unable to persist voice note: ${String(err)}`;
+    }
+  } catch (err) {
+    host.chatRecordError = `Unable to save voice note: ${String(err)}`;
+  } finally {
+    stopMediaStream(active.stream);
+    activeVoiceRecorders.delete(host);
+    host.chatRecording = false;
+  }
+}
+
+export async function handleToggleVoiceNoteRecording(host: ChatHost) {
+  if (!host.connected) {
+    return;
+  }
+  const active = activeVoiceRecorders.get(host);
+  if (active || host.chatRecording) {
+    await stopVoiceNoteRecording(host);
+    return;
+  }
+  await startVoiceNoteRecording(host);
+}
+
 export async function handleAbortChat(host: ChatHost) {
   if (!host.connected) {
     return;
   }
   host.chatMessage = "";
+  syncChatComposerLocalState(host as unknown as OpenClawApp);
   await abortChatRun(host as unknown as OpenClawApp);
 }
 
@@ -124,6 +384,7 @@ async function sendChatMessageNow(
   if (ok && opts?.restoreAttachments && opts.previousAttachments?.length) {
     host.chatAttachments = opts.previousAttachments;
   }
+  syncChatComposerLocalState(host as unknown as OpenClawApp);
   scheduleChatScroll(host as unknown as Parameters<typeof scheduleChatScroll>[0]);
   if (ok && !host.chatRunId) {
     void flushChatQueue(host);
@@ -185,6 +446,7 @@ export async function handleSendChat(
     host.chatMessage = "";
     // Clear attachments when sending
     host.chatAttachments = [];
+    syncChatComposerLocalState(host as unknown as OpenClawApp);
   }
 
   if (isChatBusy(host)) {

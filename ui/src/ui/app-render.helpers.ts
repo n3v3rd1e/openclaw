@@ -34,10 +34,12 @@ function resolveSidebarChatSessionKey(state: AppViewState): string {
 
 function resetChatStateForSessionSwitch(state: AppViewState, sessionKey: string) {
   state.sessionKey = sessionKey;
-  state.chatMessage = "";
+  state.setChatDraft("");
+  state.setChatAttachments([]);
   state.chatStream = null;
   (state as unknown as OpenClawApp).chatStreamStartedAt = null;
   state.chatRunId = null;
+  state.clearChatRecordError();
   (state as unknown as OpenClawApp).resetToolStream();
   (state as unknown as OpenClawApp).resetChatScroll();
   state.applySettings({
@@ -45,6 +47,13 @@ function resetChatStateForSessionSwitch(state: AppViewState, sessionKey: string)
     sessionKey,
     lastActiveSessionKey: sessionKey,
   });
+}
+
+function shouldAutoCollapseNavOnMobile(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+  return window.matchMedia("(max-width: 900px)").matches;
 }
 
 export function renderTab(state: AppViewState, tab: Tab) {
@@ -73,6 +82,12 @@ export function renderTab(state: AppViewState, tab: Tab) {
           }
         }
         state.setTab(tab);
+        if (shouldAutoCollapseNavOnMobile() && !state.settings.navCollapsed) {
+          state.applySettings({
+            ...state.settings,
+            navCollapsed: true,
+          });
+        }
       }}
       title=${titleForTab(tab)}
     >
@@ -135,11 +150,17 @@ export function renderChatControls(state: AppViewState) {
           ?disabled=${!state.connected}
           @change=${(e: Event) => {
             const next = (e.target as HTMLSelectElement).value;
+            if (state.chatRecording) {
+              state.chatRecordError = "Stop recording before switching sessions.";
+              return;
+            }
             state.sessionKey = next;
-            state.chatMessage = "";
+            state.setChatDraft("");
+            state.setChatAttachments([]);
             state.chatStream = null;
             (state as unknown as OpenClawApp).chatStreamStartedAt = null;
             state.chatRunId = null;
+            state.clearChatRecordError();
             (state as unknown as OpenClawApp).resetToolStream();
             (state as unknown as OpenClawApp).resetChatScroll();
             state.applySettings({
