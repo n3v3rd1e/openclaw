@@ -10,6 +10,8 @@ export function buildControlUiCspHeader(): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https:",
     "font-src 'self'",
+    // Voice notes are played from in-memory blob: URLs.
+    "media-src 'self' blob: data:",
     "connect-src 'self' ws: wss:",
   ].join("; ");
 }

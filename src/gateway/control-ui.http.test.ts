@@ -47,6 +47,7 @@ describe("handleControlUiHttpRequest", () => {
         expect(typeof csp).toBe("string");
         expect(String(csp)).toContain("frame-ancestors 'none'");
         expect(String(csp)).toContain("script-src 'self'");
+        expect(String(csp)).toContain("media-src 'self' blob: data:");
         expect(String(csp)).not.toContain("script-src 'self' 'unsafe-inline'");
       },
     });
