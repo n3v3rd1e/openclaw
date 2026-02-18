@@ -52,6 +52,7 @@ const WhatsAppSharedSchema = z.object({
   blockStreamingCoalesce: BlockStreamingCoalesceSchema.optional(),
   groups: WhatsAppGroupsSchema,
   ackReaction: WhatsAppAckReactionSchema,
+  reactionNotifications: z.enum(["off", "own", "all"]).optional().default("own"),
   debounceMs: z.number().int().nonnegative().optional().default(0),
   heartbeat: ChannelHeartbeatVisibilitySchema,
 });

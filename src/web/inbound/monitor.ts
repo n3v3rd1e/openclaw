@@ -20,13 +20,15 @@ import {
 } from "./extract.js";
 import { downloadInboundMedia } from "./media.js";
 import { createWebSendApi } from "./send-api.js";
-import type { WebInboundMessage, WebListenerCloseReason } from "./types.js";
+import type { WebInboundMessage, WebInboundReaction, WebListenerCloseReason } from "./types.js";
 
 export async function monitorWebInbox(options: {
   verbose: boolean;
   accountId: string;
   authDir: string;
   onMessage: (msg: WebInboundMessage) => Promise<void>;
+  /** Optional callback for inbound emoji reactions. */
+  onReaction?: (reaction: WebInboundReaction) => void;
   mediaMaxMb?: number;
   /** Send read receipts for incoming messages (default true). */
   sendReadReceipts?: boolean;
@@ -167,6 +169,47 @@ export async function monitorWebInbox(options: {
         continue;
       }
       if (remoteJid.endsWith("@status") || remoteJid.endsWith("@broadcast")) {
+        continue;
+      }
+
+      // --- Reaction message handling ---
+      const reactionMsg =
+        msg.message?.reactionMessage ?? msg.message?.ephemeralMessage?.message?.reactionMessage;
+      if (reactionMsg && options.onReaction) {
+        const emojiText = reactionMsg.text ?? "";
+        const isRemoval = emojiText === "";
+        const group = isJidGroup(remoteJid) === true;
+        const participantJid = msg.key?.participant ?? undefined;
+        const senderE164 = group
+          ? participantJid
+            ? await resolveInboundJid(participantJid)
+            : null
+          : await resolveInboundJid(remoteJid);
+        let groupSubject: string | undefined;
+        if (group) {
+          const meta = await getGroupMeta(remoteJid);
+          groupSubject = meta.subject;
+        }
+        const targetKey = reactionMsg.key;
+        const reaction: WebInboundReaction = {
+          emoji: emojiText,
+          isRemoval,
+          accountId: options.accountId,
+          chatId: remoteJid,
+          chatType: group ? "group" : "direct",
+          targetMessageId: targetKey?.id ?? undefined,
+          targetFromMe: targetKey?.fromMe ?? undefined,
+          senderJid: participantJid ?? (group ? undefined : remoteJid),
+          senderE164: senderE164 ?? undefined,
+          senderName: msg.pushName ?? undefined,
+          groupSubject,
+          timestamp: msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : undefined,
+        };
+        try {
+          options.onReaction(reaction);
+        } catch (err) {
+          inboundLogger.error({ error: String(err) }, "failed handling inbound reaction");
+        }
         continue;
       }
 
