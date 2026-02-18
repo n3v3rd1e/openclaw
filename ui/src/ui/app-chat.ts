@@ -42,7 +42,10 @@ const RECORDER_MIME_CANDIDATES = [
   "audio/webm",
   "audio/ogg;codecs=opus",
   "audio/ogg",
+  "audio/mp4;codecs=opus",
+  "audio/mp4;codecs=aac",
   "audio/mp4",
+  "audio/aac",
 ] as const;
 
 type ActiveVoiceRecorder = {
@@ -90,7 +93,7 @@ function isChatResetCommand(text: string) {
   return normalized.startsWith("/new ") || normalized.startsWith("/reset ");
 }
 
-function pickRecorderMimeType(): string {
+export function pickRecorderMimeType(): string {
   if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
     return "";
   }
@@ -99,15 +102,16 @@ function pickRecorderMimeType(): string {
       return candidate;
     }
   }
+  // No candidate matched — return empty; caller will let the browser choose its default.
   return "";
 }
 
-function resolveVoiceNoteExtension(mimeType: string): string {
+export function resolveVoiceNoteExtension(mimeType: string): string {
   const normalized = mimeType.toLowerCase();
   if (normalized.includes("ogg")) {
     return "ogg";
   }
-  if (normalized.includes("mp4") || normalized.includes("m4a")) {
+  if (normalized.includes("mp4") || normalized.includes("m4a") || normalized.includes("aac")) {
     return "m4a";
   }
   if (normalized.includes("mpeg") || normalized.includes("mp3")) {
@@ -182,11 +186,15 @@ async function startVoiceNoteRecording(host: ChatHost) {
     return;
   }
   if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-    host.chatRecordError = "Microphone recording is not supported in this browser.";
+    host.chatRecordError =
+      typeof window !== "undefined" && window.location?.protocol === "http:"
+        ? "Microphone requires a secure (HTTPS) connection."
+        : "Microphone access is not available in this browser.";
     return;
   }
   if (typeof MediaRecorder === "undefined") {
-    host.chatRecordError = "Microphone recording is not supported in this browser.";
+    host.chatRecordError =
+      "MediaRecorder API is not available. Update your browser or try Safari 14.3+/Chrome.";
     return;
   }
 
