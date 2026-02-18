@@ -54,6 +54,8 @@ export type ChatProps = {
   // Image attachments
   attachments?: ChatAttachment[];
   onAttachmentsChange?: (attachments: ChatAttachment[]) => void;
+  recording?: boolean;
+  recordError?: string | null;
   // Scroll control
   showNewMessages?: boolean;
   onScrollToBottom?: () => void;
@@ -65,6 +67,8 @@ export type ChatProps = {
   onAbort?: () => void;
   onQueueRemove: (id: string) => void;
   onNewSession: () => void;
+  onRecordToggle?: () => void;
+  onClearRecordError?: () => void;
   onOpenSidebar?: (content: string) => void;
   onCloseSidebar?: () => void;
   onSplitRatioChange?: (ratio: number) => void;
@@ -109,6 +113,66 @@ function renderCompactionIndicator(status: CompactionIndicatorStatus | null | un
 
 function generateAttachmentId(): string {
   return `att-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function isVoiceNoteAttachment(att: ChatAttachment): boolean {
+  if (att.kind === "voice-note") {
+    return true;
+  }
+  return att.mimeType.toLowerCase().startsWith("audio/");
+}
+
+function getAttachmentTranscript(att: ChatAttachment): string {
+  if (typeof att.transcript === "string") {
+    return att.transcript;
+  }
+  if (!Array.isArray(att.transcriptParts)) {
+    return "";
+  }
+  return att.transcriptParts.join("\n");
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      resolve(reader.result as string);
+    });
+    reader.addEventListener("error", () => {
+      reject(new Error(`failed to read ${file.name || "attachment"}`));
+    });
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleAttachmentInput(event: Event, props: ChatProps): Promise<void> {
+  if (!props.onAttachmentsChange) {
+    return;
+  }
+  const target = event.target as HTMLInputElement;
+  const files = Array.from(target.files ?? []);
+  if (files.length === 0) {
+    return;
+  }
+
+  const nextAttachments: ChatAttachment[] = [];
+  for (const file of files) {
+    const dataUrl = await readFileAsDataUrl(file);
+    const mimeType = file.type || "application/octet-stream";
+    const voiceNote = mimeType.toLowerCase().startsWith("audio/");
+    nextAttachments.push({
+      id: generateAttachmentId(),
+      kind: voiceNote ? "voice-note" : "image",
+      dataUrl,
+      mimeType,
+      fileName: file.name || undefined,
+      source: voiceNote ? "upload" : undefined,
+    });
+  }
+
+  const current = props.attachments ?? [];
+  props.onAttachmentsChange([...current, ...nextAttachments]);
+  target.value = "";
 }
 
 function handlePaste(e: ClipboardEvent, props: ChatProps) {
@@ -160,30 +224,81 @@ function renderAttachmentPreview(props: ChatProps) {
 
   return html`
     <div class="chat-attachments">
-      ${attachments.map(
-        (att) => html`
-          <div class="chat-attachment">
-            <img
-              src=${att.dataUrl}
-              alt="Attachment preview"
-              class="chat-attachment__img"
-            />
-            <button
-              class="chat-attachment__remove"
-              type="button"
-              aria-label="Remove attachment"
-              @click=${() => {
-                const next = (props.attachments ?? []).filter((a) => a.id !== att.id);
-                props.onAttachmentsChange?.(next);
-              }}
-            >
-              ${icons.x}
-            </button>
-          </div>
-        `,
-      )}
+      ${attachments.map((att) => {
+        if (isVoiceNoteAttachment(att)) {
+          const transcript = getAttachmentTranscript(att);
+          const noteLabel = att.fileName?.trim() || "Voice note";
+          return html`
+              <div class="chat-attachment chat-attachment--voice">
+                <div class="chat-voice-note">
+                  <div class="chat-voice-note__title">${noteLabel}</div>
+                  <audio controls preload="metadata" src=${att.previewUrl ?? att.dataUrl}></audio>
+                  ${
+                    transcript
+                      ? html`
+                        <details class="chat-voice-note__drawer">
+                          <summary>Transcript</summary>
+                          <div class="chat-voice-note__transcript-preview">${transcript}</div>
+                        </details>
+                      `
+                      : nothing
+                  }
+                </div>
+                <button
+                  class="chat-attachment__remove"
+                  type="button"
+                  aria-label="Remove attachment"
+                  @click=${() => {
+                    const next = (props.attachments ?? []).filter((a) => a.id !== att.id);
+                    props.onAttachmentsChange?.(next);
+                  }}
+                >
+                  ${icons.x}
+                </button>
+              </div>
+            `;
+        }
+
+        return html`
+            <div class="chat-attachment">
+              <img
+                src=${att.dataUrl}
+                alt="Attachment preview"
+                class="chat-attachment__img"
+              />
+              <button
+                class="chat-attachment__remove"
+                type="button"
+                aria-label="Remove attachment"
+                @click=${() => {
+                  const next = (props.attachments ?? []).filter((a) => a.id !== att.id);
+                  props.onAttachmentsChange?.(next);
+                }}
+              >
+                ${icons.x}
+              </button>
+            </div>
+          `;
+      })}
     </div>
   `;
+}
+
+function describeQueueItem(item: ChatQueueItem): string {
+  if (item.text) {
+    return item.text;
+  }
+  const attachments = item.attachments ?? [];
+  const imageCount = attachments.filter((attachment) => !isVoiceNoteAttachment(attachment)).length;
+  const voiceCount = attachments.filter((attachment) => isVoiceNoteAttachment(attachment)).length;
+  const labels: string[] = [];
+  if (imageCount > 0) {
+    labels.push(`Image (${imageCount})`);
+  }
+  if (voiceCount > 0) {
+    labels.push(`Voice note (${voiceCount})`);
+  }
+  return labels.join(" + ");
 }
 
 export function renderChat(props: ChatProps) {
@@ -199,11 +314,13 @@ export function renderChat(props: ChatProps) {
   };
 
   const hasAttachments = (props.attachments?.length ?? 0) > 0;
+  const isRecording = Boolean(props.recording);
   const composePlaceholder = props.connected
     ? hasAttachments
-      ? "Add a message or paste more images..."
-      : "Message (↩ to send, Shift+↩ for line breaks, paste images)"
+      ? "Add a message, or send with attachments..."
+      : "Message (↩ to send, Shift+↩ for line breaks, paste images, attach voice notes)"
     : "Connect to the gateway to start chatting…";
+  const uploadInputId = `chat-upload-${props.sessionKey.replace(/[^a-z0-9_-]/gi, "-")}`;
 
   const splitRatio = props.splitRatio ?? 0.6;
   const sidebarOpen = Boolean(props.sidebarOpen && props.onCloseSidebar);
@@ -330,10 +447,7 @@ export function renderChat(props: ChatProps) {
                   (item) => html`
                     <div class="chat-queue__item">
                       <div class="chat-queue__text">
-                        ${
-                          item.text ||
-                          (item.attachments?.length ? `Image (${item.attachments.length})` : "")
-                        }
+                        ${describeQueueItem(item)}
                       </div>
                       <button
                         class="btn chat-queue__remove"
@@ -370,6 +484,58 @@ export function renderChat(props: ChatProps) {
 
       <div class="chat-compose">
         ${renderAttachmentPreview(props)}
+        <div class="chat-compose__tools">
+          <input
+            id=${uploadInputId}
+            class="chat-file-input"
+            type="file"
+            accept="image/*,audio/*"
+            multiple
+            @change=${(event: Event) => {
+              void handleAttachmentInput(event, props);
+            }}
+          />
+          <button
+            class="btn"
+            type="button"
+            ?disabled=${!props.connected || !props.onAttachmentsChange}
+            @click=${() => {
+              const input = document.getElementById(uploadInputId) as HTMLInputElement | null;
+              input?.click();
+            }}
+          >
+            Attach
+          </button>
+          <button
+            class="btn"
+            type="button"
+            ?disabled=${!props.connected || !props.onRecordToggle}
+            aria-pressed=${isRecording}
+            @click=${() => {
+              props.onRecordToggle?.();
+            }}
+          >
+            ${isRecording ? "Stop" : "Record"}
+          </button>
+        </div>
+        ${
+          props.recordError
+            ? html`
+              <div class="callout danger chat-record-error">
+                ${props.recordError}
+                ${
+                  props.onClearRecordError
+                    ? html`
+                      <button class="btn btn--sm" type="button" @click=${props.onClearRecordError}>
+                        Dismiss
+                      </button>
+                    `
+                    : nothing
+                }
+              </div>
+            `
+            : nothing
+        }
         <div class="chat-compose__row">
           <label class="field chat-compose__field">
             <span>Message</span>

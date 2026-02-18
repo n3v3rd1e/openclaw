@@ -2724,6 +2724,39 @@ public struct ChatInjectParams: Codable, Sendable {
     }
 }
 
+public struct VoiceNotesSaveParams: Codable, Sendable {
+    public let sessionkey: String?
+    public let source: AnyCodable?
+    public let durationms: Int?
+    public let transcript: String?
+    public let transcriptparts: [String]?
+    public let audio: [String: AnyCodable]
+
+    public init(
+        sessionkey: String?,
+        source: AnyCodable?,
+        durationms: Int?,
+        transcript: String?,
+        transcriptparts: [String]?,
+        audio: [String: AnyCodable]
+    ) {
+        self.sessionkey = sessionkey
+        self.source = source
+        self.durationms = durationms
+        self.transcript = transcript
+        self.transcriptparts = transcriptparts
+        self.audio = audio
+    }
+    private enum CodingKeys: String, CodingKey {
+        case sessionkey = "sessionKey"
+        case source
+        case durationms = "durationMs"
+        case transcript
+        case transcriptparts = "transcriptParts"
+        case audio
+    }
+}
+
 public struct ChatEvent: Codable, Sendable {
     public let runid: String
     public let sessionkey: String

@@ -18,14 +18,26 @@ fi
 
 # Security: avoid option-injection from malicious file names (e.g. "--all", "--force").
 # Robustness: NUL-delimited file list handles spaces/newlines safely.
-mapfile -d '' -t files < <(git diff --cached --name-only --diff-filter=ACMR -z)
+# NOTE: macOS ships bash 3.2 which doesn't support `mapfile`, so use a portable NUL-reader.
+read_nul_list() {
+  local outvar="$1"
+  # init target array
+  eval "$outvar=()"
+  local item escaped
+  while IFS= read -r -d '' item; do
+    printf -v escaped %q "$item"
+    eval "$outvar+=($escaped)"
+  done
+}
+
+read_nul_list files < <(git diff --cached --name-only --diff-filter=ACMR -z)
 
 if [ "${#files[@]}" -eq 0 ]; then
   exit 0
 fi
 
-mapfile -d '' -t lint_files < <(node "$FILTER_FILES" lint -- "${files[@]}")
-mapfile -d '' -t format_files < <(node "$FILTER_FILES" format -- "${files[@]}")
+read_nul_list lint_files < <(node "$FILTER_FILES" lint -- "${files[@]}")
+read_nul_list format_files < <(node "$FILTER_FILES" format -- "${files[@]}")
 
 if [ "${#lint_files[@]}" -gt 0 ]; then
   "$RUN_NODE_TOOL" oxlint --type-aware --fix -- "${lint_files[@]}"

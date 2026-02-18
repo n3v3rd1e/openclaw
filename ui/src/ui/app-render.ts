@@ -215,8 +215,14 @@ export function renderApp(state: AppViewState) {
                 onSettingsChange: (next) => state.applySettings(next),
                 onPasswordChange: (next) => (state.password = next),
                 onSessionKeyChange: (next) => {
+                  if (state.chatRecording) {
+                    state.chatRecordError = "Stop recording before switching sessions.";
+                    return;
+                  }
                   state.sessionKey = next;
-                  state.chatMessage = "";
+                  state.setChatDraft("");
+                  state.setChatAttachments([]);
+                  state.clearChatRecordError();
                   state.resetToolStream();
                   state.applySettings({
                     ...state.settings,
@@ -788,13 +794,18 @@ export function renderApp(state: AppViewState) {
             ? renderChat({
                 sessionKey: state.sessionKey,
                 onSessionKeyChange: (next) => {
+                  if (state.chatRecording) {
+                    state.chatRecordError = "Stop recording before switching sessions.";
+                    return;
+                  }
                   state.sessionKey = next;
-                  state.chatMessage = "";
-                  state.chatAttachments = [];
+                  state.setChatDraft("");
+                  state.setChatAttachments([]);
                   state.chatStream = null;
                   state.chatStreamStartedAt = null;
                   state.chatRunId = null;
                   state.chatQueue = [];
+                  state.clearChatRecordError();
                   state.resetToolStream();
                   state.resetChatScroll();
                   state.applySettings({
@@ -838,9 +849,13 @@ export function renderApp(state: AppViewState) {
                   });
                 },
                 onChatScroll: (event) => state.handleChatScroll(event),
-                onDraftChange: (next) => (state.chatMessage = next),
+                onDraftChange: (next) => state.setChatDraft(next),
                 attachments: state.chatAttachments,
-                onAttachmentsChange: (next) => (state.chatAttachments = next),
+                onAttachmentsChange: (next) => state.setChatAttachments(next),
+                recording: state.chatRecording,
+                recordError: state.chatRecordError,
+                onRecordToggle: () => void state.handleToggleVoiceNoteRecording(),
+                onClearRecordError: () => state.clearChatRecordError(),
                 onSend: () => state.handleSendChat(),
                 canAbort: Boolean(state.chatRunId),
                 onAbort: () => void state.handleAbortChat(),

@@ -4,6 +4,14 @@ import type {
   GroupPolicy,
   MarkdownConfig,
 } from "./types.base.js";
+
+/**
+ * Controls which inbound reactions surface to the agent:
+ * - "off": ignore all reactions
+ * - "own": only reactions to messages the bot sent (default)
+ * - "all": all reactions in allowed chats
+ */
+export type WhatsAppReactionNotificationMode = "off" | "own" | "all";
 import type { ChannelHeartbeatVisibilityConfig } from "./types.channels.js";
 import type { DmConfig } from "./types.messages.js";
 import type { GroupToolPolicyBySenderConfig, GroupToolPolicyConfig } from "./types.tools.js";
@@ -97,6 +105,8 @@ export type WhatsAppConfig = {
   groups?: Record<string, WhatsAppGroupConfig>;
   /** Acknowledgment reaction sent immediately upon message receipt. */
   ackReaction?: WhatsAppAckReactionConfig;
+  /** Reaction notification mode (off|own|all). Default: own. */
+  reactionNotifications?: WhatsAppReactionNotificationMode;
   /** Debounce window (ms) for batching rapid consecutive messages from the same sender (0 to disable). */
   debounceMs?: number;
   /** Heartbeat visibility settings for this channel. */
@@ -145,6 +155,8 @@ export type WhatsAppAccountConfig = {
   groups?: Record<string, WhatsAppGroupConfig>;
   /** Acknowledgment reaction sent immediately upon message receipt. */
   ackReaction?: WhatsAppAckReactionConfig;
+  /** Reaction notification mode (off|own|all). Default: own. */
+  reactionNotifications?: WhatsAppReactionNotificationMode;
   /** Debounce window (ms) for batching rapid consecutive messages from the same sender (0 to disable). */
   debounceMs?: number;
   /** Heartbeat visibility settings for this account. */

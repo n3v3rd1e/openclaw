@@ -189,6 +189,8 @@ export async function monitorWebChannel(
       return !hasControlCommand(msg.body, cfg);
     };
 
+    const reactionMode = account.reactionNotifications ?? "own";
+
     const listener = await (listenerFactory ?? monitorWebInbox)({
       verbose,
       accountId: account.accountId,
@@ -197,6 +199,54 @@ export async function monitorWebChannel(
       sendReadReceipts: account.sendReadReceipts,
       debounceMs: inboundDebounceMs,
       shouldDebounce,
+      onReaction: (reaction) => {
+        if (reactionMode === "off") {
+          return;
+        }
+        if (reaction.isRemoval) {
+          return;
+        }
+        if (reactionMode === "own" && !reaction.targetFromMe) {
+          return;
+        }
+        const emoji = reaction.emoji || "emoji";
+        const actor = reaction.senderName ?? reaction.senderE164 ?? "someone";
+        const groupLabel = reaction.groupSubject
+          ? ` in ${reaction.groupSubject}`
+          : reaction.chatType === "group"
+            ? ` in group ${reaction.chatId}`
+            : "";
+        const targetLabel = reaction.targetMessageId
+          ? ` on message ${reaction.targetMessageId}`
+          : "";
+        const text = `${actor} reacted ${emoji}${targetLabel}${groupLabel}`;
+        logVerbose(`whatsapp reaction: ${emoji} from ${actor}`);
+        const peerId =
+          reaction.chatType === "group"
+            ? reaction.chatId
+            : (reaction.senderE164 ?? reaction.senderJid ?? reaction.chatId);
+        const route = resolveAgentRoute({
+          cfg: loadConfig(),
+          channel: "whatsapp",
+          accountId: reaction.accountId,
+          peer: {
+            kind: reaction.chatType === "group" ? "group" : "direct",
+            id: peerId,
+          },
+        });
+        const contextKey = [
+          "whatsapp",
+          "reaction",
+          "added",
+          reaction.targetMessageId ?? "",
+          reaction.senderJid ?? reaction.senderE164 ?? "",
+          emoji,
+          reaction.chatId,
+        ]
+          .filter(Boolean)
+          .join(":");
+        enqueueSystemEvent(text, { sessionKey: route.sessionKey, contextKey });
+      },
       onMessage: async (msg: WebInboundMsg) => {
         handledMessages += 1;
         lastMessageAt = Date.now();

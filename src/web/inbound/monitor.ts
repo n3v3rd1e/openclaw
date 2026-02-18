@@ -20,13 +20,15 @@ import {
 } from "./extract.js";
 import { downloadInboundMedia } from "./media.js";
 import { createWebSendApi } from "./send-api.js";
-import type { WebInboundMessage, WebListenerCloseReason } from "./types.js";
+import type { WebInboundMessage, WebInboundReaction, WebListenerCloseReason } from "./types.js";
 
 export async function monitorWebInbox(options: {
   verbose: boolean;
   accountId: string;
   authDir: string;
   onMessage: (msg: WebInboundMessage) => Promise<void>;
+  /** Optional callback for inbound emoji reactions. */
+  onReaction?: (reaction: WebInboundReaction) => void;
   mediaMaxMb?: number;
   /** Send read receipts for incoming messages (default true). */
   sendReadReceipts?: boolean;
@@ -167,6 +169,120 @@ export async function monitorWebInbox(options: {
         continue;
       }
       if (remoteJid.endsWith("@status") || remoteJid.endsWith("@broadcast")) {
+        continue;
+      }
+
+      // --- Reaction message handling ---
+      const reactionMsg =
+        msg.message?.reactionMessage ?? msg.message?.ephemeralMessage?.message?.reactionMessage;
+      if (reactionMsg) {
+        const emojiText = reactionMsg.text ?? "";
+        const isRemoval = emojiText === "";
+        const group = isJidGroup(remoteJid) === true;
+        const participantJid = msg.key?.participant ?? undefined;
+        const senderE164 = group
+          ? participantJid
+            ? await resolveInboundJid(participantJid)
+            : null
+          : await resolveInboundJid(remoteJid);
+        let groupSubject: string | undefined;
+        let groupParticipants: string[] | undefined;
+        if (group) {
+          const meta = await getGroupMeta(remoteJid);
+          groupSubject = meta.subject;
+          groupParticipants = meta.participants;
+        }
+        const targetKey = reactionMsg.key;
+        const reaction: WebInboundReaction = {
+          emoji: emojiText,
+          isRemoval,
+          accountId: options.accountId,
+          chatId: remoteJid,
+          chatType: group ? "group" : "direct",
+          targetMessageId: targetKey?.id ?? undefined,
+          targetFromMe: targetKey?.fromMe ?? undefined,
+          senderJid: participantJid ?? (group ? undefined : remoteJid),
+          senderE164: senderE164 ?? undefined,
+          senderName: msg.pushName ?? undefined,
+          groupSubject,
+          timestamp: msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : undefined,
+        };
+
+        // Notify reaction callback (optional)
+        if (options.onReaction) {
+          try {
+            options.onReaction(reaction);
+          } catch (err) {
+            inboundLogger.error({ error: String(err) }, "failed handling inbound reaction");
+          }
+        }
+
+        // ALSO surface reactions via the normal inbound message pipeline so they
+        // trigger agent turns even when the user only reacts (no follow-up text).
+        const chatJid = remoteJid;
+        const sendComposing = async () => {
+          try {
+            await sock.sendPresenceUpdate("composing", chatJid);
+          } catch (err) {
+            logVerbose(`Presence update failed: ${String(err)}`);
+          }
+        };
+        const reply = async (text: string) => {
+          await sock.sendMessage(chatJid, { text });
+        };
+        const sendMedia = async (payload: AnyMessageContent) => {
+          await sock.sendMessage(chatJid, payload);
+        };
+
+        const from = group ? remoteJid : (senderE164 ?? (await resolveInboundJid(remoteJid)));
+        if (from) {
+          const senderName = msg.pushName ?? undefined;
+          const body = reaction.targetMessageId
+            ? `Reaction ${reaction.emoji} on ${reaction.targetMessageId}`
+            : `Reaction ${reaction.emoji}`;
+          const inboundMessage: WebInboundMessage = {
+            id,
+            from,
+            conversationId: from,
+            to: selfE164 ?? "me",
+            accountId: options.accountId,
+            body,
+            pushName: senderName,
+            timestamp: reaction.timestamp,
+            chatType: group ? "group" : "direct",
+            chatId: remoteJid,
+            senderJid: participantJid,
+            senderE164: senderE164 ?? undefined,
+            senderName,
+            groupSubject,
+            groupParticipants,
+            selfJid,
+            selfE164,
+            sendComposing,
+            reply,
+            sendMedia,
+            reaction,
+          };
+          try {
+            const task = Promise.resolve(debouncer.enqueue(inboundMessage));
+            void task.catch((err) => {
+              inboundLogger.error(
+                { error: String(err) },
+                "failed handling inbound reaction as message",
+              );
+              inboundConsoleLog.error(
+                `Failed handling inbound reaction as message: ${String(err)}`,
+              );
+            });
+          } catch (err) {
+            inboundLogger.error(
+              { error: String(err) },
+              "failed handling inbound reaction as message",
+            );
+            inboundConsoleLog.error(`Failed handling inbound reaction as message: ${String(err)}`);
+          }
+        }
+
         continue;
       }
 

@@ -23,6 +23,7 @@ import { ttsHandlers } from "./server-methods/tts.js";
 import type { GatewayRequestHandlers, GatewayRequestOptions } from "./server-methods/types.js";
 import { updateHandlers } from "./server-methods/update.js";
 import { usageHandlers } from "./server-methods/usage.js";
+import { voiceNotesHandlers } from "./server-methods/voice-notes.js";
 import { voicewakeHandlers } from "./server-methods/voicewake.js";
 import { webHandlers } from "./server-methods/web.js";
 import { wizardHandlers } from "./server-methods/wizard.js";
@@ -96,6 +97,7 @@ const WRITE_METHODS = new Set([
   "node.invoke",
   "chat.send",
   "chat.abort",
+  "voice-notes.save",
   "browser.request",
   "mesh.plan.auto",
   "mesh.run",
@@ -179,6 +181,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...logsHandlers,
   ...meshHandlers,
   ...voicewakeHandlers,
+  ...voiceNotesHandlers,
   ...healthHandlers,
   ...channelsHandlers,
   ...chatHandlers,

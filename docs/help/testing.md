@@ -35,6 +35,20 @@ When debugging real providers/models (requires real creds):
 
 Tip: when you only need one failing case, prefer narrowing live tests via the allowlist env vars described below.
 
+## Control UI voice-note smoke
+
+Use this manual smoke check when you change chat voice-note recording in Control UI:
+
+1. Start the gateway and open Control UI chat.
+2. Test on desktop and mobile viewport widths.
+3. Click `Record` and confirm the browser asks for microphone access.
+4. Confirm `Record` switches to `Stop` without opening a file picker.
+5. Speak for a few seconds, click `Stop`, and confirm a voice-note bubble appears immediately.
+6. Verify persistence on disk:
+   `ls -1 ~/.openclaw/voice-notes | tail -n 3`
+7. Refresh the page and confirm the same voice-note bubble still appears in chat history.
+8. Deny mic access, click `Record` again, and confirm the denied-permission callout is shown.
+
 ## Test suites (what runs where)
 
 Think of the suites as “increasing realism” (and increasing flakiness/cost):
