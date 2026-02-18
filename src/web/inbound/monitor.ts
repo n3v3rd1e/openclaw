@@ -219,63 +219,53 @@ export async function monitorWebInbox(options: {
 
         // ALSO surface reactions via the normal inbound message pipeline so they
         // trigger agent turns even when the user only reacts (no follow-up text).
-        if (options.onMessage) {
-          const chatJid = remoteJid;
-          const sendComposing = async () => {
-            try {
-              await sock.sendPresenceUpdate("composing", chatJid);
-            } catch (err) {
-              logVerbose(`Presence update failed: ${String(err)}`);
-            }
-          };
-          const reply = async (text: string) => {
-            await sock.sendMessage(chatJid, { text });
-          };
-          const sendMedia = async (payload: AnyMessageContent) => {
-            await sock.sendMessage(chatJid, payload);
-          };
+        const chatJid = remoteJid;
+        const sendComposing = async () => {
+          try {
+            await sock.sendPresenceUpdate("composing", chatJid);
+          } catch (err) {
+            logVerbose(`Presence update failed: ${String(err)}`);
+          }
+        };
+        const reply = async (text: string) => {
+          await sock.sendMessage(chatJid, { text });
+        };
+        const sendMedia = async (payload: AnyMessageContent) => {
+          await sock.sendMessage(chatJid, payload);
+        };
 
-          const from = group ? remoteJid : (senderE164 ?? (await resolveInboundJid(remoteJid)));
-          if (from) {
-            const senderName = msg.pushName ?? undefined;
-            const body = reaction.targetMessageId
-              ? `Reaction ${reaction.emoji} on ${reaction.targetMessageId}`
-              : `Reaction ${reaction.emoji}`;
-            const inboundMessage: WebInboundMessage = {
-              id,
-              from,
-              conversationId: from,
-              to: selfE164 ?? "me",
-              accountId: options.accountId,
-              body,
-              pushName: senderName,
-              timestamp: reaction.timestamp,
-              chatType: group ? "group" : "direct",
-              chatId: remoteJid,
-              senderJid: participantJid,
-              senderE164: senderE164 ?? undefined,
-              senderName,
-              groupSubject,
-              groupParticipants,
-              selfJid,
-              selfE164,
-              sendComposing,
-              reply,
-              sendMedia,
-              reaction,
-            };
-            try {
-              const task = Promise.resolve(debouncer.enqueue(inboundMessage));
-              void task.catch((err) => {
-                inboundLogger.error(
-                  { error: String(err) },
-                  "failed handling inbound reaction as message",
-                );
-                inboundConsoleLog.error(
-                  `Failed handling inbound reaction as message: ${String(err)}`,
-                );
-              });
-            } catch (err) {
+        const from = group ? remoteJid : (senderE164 ?? (await resolveInboundJid(remoteJid)));
+        if (from) {
+          const senderName = msg.pushName ?? undefined;
+          const body = reaction.targetMessageId
+            ? `Reaction ${reaction.emoji} on ${reaction.targetMessageId}`
+            : `Reaction ${reaction.emoji}`;
+          const inboundMessage: WebInboundMessage = {
+            id,
+            from,
+            conversationId: from,
+            to: selfE164 ?? "me",
+            accountId: options.accountId,
+            body,
+            pushName: senderName,
+            timestamp: reaction.timestamp,
+            chatType: group ? "group" : "direct",
+            chatId: remoteJid,
+            senderJid: participantJid,
+            senderE164: senderE164 ?? undefined,
+            senderName,
+            groupSubject,
+            groupParticipants,
+            selfJid,
+            selfE164,
+            sendComposing,
+            reply,
+            sendMedia,
+            reaction,
+          };
+          try {
+            const task = Promise.resolve(debouncer.enqueue(inboundMessage));
+            void task.catch((err) => {
               inboundLogger.error(
                 { error: String(err) },
                 "failed handling inbound reaction as message",
@@ -283,7 +273,13 @@ export async function monitorWebInbox(options: {
               inboundConsoleLog.error(
                 `Failed handling inbound reaction as message: ${String(err)}`,
               );
-            }
+            });
+          } catch (err) {
+            inboundLogger.error(
+              { error: String(err) },
+              "failed handling inbound reaction as message",
+            );
+            inboundConsoleLog.error(`Failed handling inbound reaction as message: ${String(err)}`);
           }
         }
 
