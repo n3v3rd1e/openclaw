@@ -40,6 +40,8 @@ export type WebInboundMessage = {
   to: string;
   accountId: string;
   body: string;
+  /** Optional reaction metadata when this inbound event represents a WhatsApp reaction. */
+  reaction?: WebInboundReaction;
   pushName?: string;
   timestamp?: number;
   chatType: "direct" | "group";

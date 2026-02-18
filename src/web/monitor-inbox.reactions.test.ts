@@ -60,8 +60,11 @@ describe("web monitor inbox reactions", () => {
     expect(reaction.senderName).toBe("Alice");
     expect(reaction.accountId).toBe(DEFAULT_ACCOUNT_ID);
 
-    // Should NOT have been forwarded as a normal message
-    expect(onMessage).not.toHaveBeenCalled();
+    // Should be forwarded as a normal inbound message too (so reactions trigger agent turns)
+    expect(onMessage).toHaveBeenCalledTimes(1);
+    const msg = onMessage.mock.calls[0][0];
+    expect(msg.reaction?.emoji).toBe("❤️");
+    expect(msg.body).toContain("Reaction");
   });
 
   it("detects reaction removals (empty text)", async () => {
@@ -157,7 +160,7 @@ describe("web monitor inbox reactions", () => {
     expect(onReaction.mock.calls[0][0].targetFromMe).toBe(false);
   });
 
-  it("skips reactions when onReaction is not provided", async () => {
+  it("surfaces reactions as normal messages even when onReaction is not provided", async () => {
     const sock = getSock();
     const onMessage = vi.fn();
 
@@ -196,7 +199,11 @@ describe("web monitor inbox reactions", () => {
 
     await new Promise((r) => setTimeout(r, 50));
 
-    // Reaction messages should not appear as normal messages
-    expect(onMessage).not.toHaveBeenCalled();
+    expect(onMessage).toHaveBeenCalledTimes(1);
+    const msg = onMessage.mock.calls[0][0];
+    expect(msg.body).toContain("Reaction");
+    expect(msg.body).toContain("😂");
+    expect(msg.reaction?.emoji).toBe("😂");
+    expect(msg.reaction?.targetMessageId).toBe("original-msg-3");
   });
 });
