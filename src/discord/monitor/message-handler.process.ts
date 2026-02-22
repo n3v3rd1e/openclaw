@@ -25,6 +25,7 @@ import { resolveMarkdownTableMode } from "../../config/markdown-tables.js";
 import { readSessionUpdatedAt, resolveStorePath } from "../../config/sessions.js";
 import { danger, logVerbose, shouldLogVerbose } from "../../globals.js";
 import { convertMarkdownTables } from "../../markdown/tables.js";
+import { transcribeFirstAudio } from "../../media-understanding/audio-preflight.js";
 import { buildAgentSessionKey } from "../../routing/resolve-route.js";
 import { resolveThreadSessionKeys } from "../../routing/session-key.js";
 import { buildUntrustedChannelMetadata } from "../../security/channel-metadata.js";
@@ -103,7 +104,28 @@ export async function processDiscordMessage(ctx: DiscordMessagePreflightContext)
   const mediaList = await resolveMediaList(message, mediaMaxBytes);
   const forwardedMediaList = await resolveForwardedMediaList(message, mediaMaxBytes);
   mediaList.push(...forwardedMediaList);
-  const text = messageText;
+
+  // Auto-transcribe audio attachments before routing to agent
+  let audioTranscript: string | undefined;
+  const audioMedia = mediaList.filter((m) => m.contentType?.startsWith("audio/"));
+  if (audioMedia.length > 0 && cfg.tools?.media?.audio?.enabled !== false) {
+    try {
+      const tempCtx = {
+        MediaUrls: audioMedia.map((m) => m.path),
+        MediaTypes: audioMedia.map((m) => m.contentType).filter(Boolean) as string[],
+      };
+      audioTranscript = await transcribeFirstAudio({ ctx: tempCtx, cfg, agentDir: undefined });
+      if (audioTranscript && shouldLogVerbose()) {
+        logVerbose(`discord: auto-transcribed audio (${audioTranscript.length} chars)`);
+      }
+    } catch (err) {
+      logVerbose(`discord: audio auto-transcription failed: ${String(err)}`);
+    }
+  }
+
+  const text = audioTranscript
+    ? `${messageText ? `${messageText}\n` : ""}[Audio] Transcript: ${audioTranscript}`
+    : messageText;
   if (!text) {
     logVerbose(`discord: drop message ${message.id} (empty content)`);
     return;
