@@ -111,6 +111,7 @@ export async function processDiscordMessage(ctx: DiscordMessagePreflightContext)
   if (audioMedia.length > 0 && cfg.tools?.media?.audio?.enabled !== false) {
     try {
       const tempCtx = {
+        MediaPaths: audioMedia.map((m) => m.path),
         MediaUrls: audioMedia.map((m) => m.path),
         MediaTypes: audioMedia.map((m) => m.contentType).filter(Boolean) as string[],
       };
