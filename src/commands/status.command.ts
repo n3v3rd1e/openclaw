@@ -199,6 +199,7 @@ export async function statusCommand(
       bind: cfg.gateway?.bind,
       customBindHost: cfg.gateway?.customBindHost,
       basePath: cfg.gateway?.controlUi?.basePath,
+      tls: cfg.gateway?.tls?.enabled === true,
     });
     return links.httpUrl;
   })();

@@ -39,6 +39,7 @@ type GatewayStatusSummary = {
   portSource: "service args" | "env/config";
   probeUrl: string;
   probeNote?: string;
+  tls?: boolean;
 };
 
 export type DaemonStatus = {
@@ -182,7 +183,8 @@ export async function gatherDaemonStatus(
   const probeHost = pickProbeHostForBind(bindMode, tailnetIPv4, customBindHost);
   const probeUrlOverride =
     typeof opts.rpc.url === "string" && opts.rpc.url.trim().length > 0 ? opts.rpc.url.trim() : null;
-  const probeUrl = probeUrlOverride ?? `ws://${probeHost}:${daemonPort}`;
+  const tlsEnabled = daemonCfg.gateway?.tls?.enabled === true;
+  const probeUrl = probeUrlOverride ?? `${tlsEnabled ? "wss" : "ws"}://${probeHost}:${daemonPort}`;
   const probeNote =
     !probeUrlOverride && bindMode === "lan"
       ? `bind=lan listens on 0.0.0.0 (all interfaces); probing via ${probeHost}.`
@@ -265,6 +267,7 @@ export async function gatherDaemonStatus(
       portSource,
       probeUrl,
       ...(probeNote ? { probeNote } : {}),
+      ...(daemonCfg.gateway?.tls?.enabled === true ? { tls: true } : {}),
     },
     port: portStatus,
     ...(portCliStatus ? { portCli: portCliStatus } : {}),
