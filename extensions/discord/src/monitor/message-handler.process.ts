@@ -144,7 +144,12 @@ export async function processDiscordMessage(
     return;
   }
   mediaList.push(...forwardedMediaList);
-  const text = messageText;
+
+  // Reuse audio transcript from preflight (already transcribed for mention detection).
+  // Prepend it to messageText so the agent sees the voice note content.
+  const text = ctx.preflightTranscript
+    ? `${messageText ? `${messageText}\n` : ""}[Audio transcript]: ${ctx.preflightTranscript}`
+    : messageText;
   if (!text) {
     logVerbose("discord: drop message " + message.id + " (empty content)");
     return;

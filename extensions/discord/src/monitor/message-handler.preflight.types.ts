@@ -88,6 +88,9 @@ export type DiscordMessagePreflightContext = DiscordMessagePreflightSharedFields
   effectiveWasMentioned: boolean;
   canDetectMention: boolean;
 
+  /** Audio transcript from preflight (voice notes). Reused in process to avoid double-transcription. */
+  preflightTranscript?: string;
+
   historyEntry?: HistoryEntry;
   threadBindings: DiscordThreadBindingLookup;
   discordRestFetch?: typeof fetch;

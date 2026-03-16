@@ -940,6 +940,7 @@ export async function preflightDiscordMessage(
     shouldBypassMention: mentionGate.shouldBypassMention,
     effectiveWasMentioned,
     canDetectMention,
+    preflightTranscript: preflightTranscript || undefined,
     historyEntry,
     threadBindings: params.threadBindings,
     discordRestFetch: params.discordRestFetch,
