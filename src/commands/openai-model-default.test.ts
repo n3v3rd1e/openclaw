@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import type { OpenClawConfig } from "../config/config.js";
-import type { WizardPrompter } from "../wizard/prompts.js";
-import { applyDefaultModelChoice } from "./auth-choice.default-model.js";
 import {
   applyGoogleGeminiModelDefault,
   GOOGLE_GEMINI_DEFAULT_MODEL,
-} from "./google-gemini-model-default.js";
+} from "../../extensions/google/api.js";
 import {
   applyOpenAIConfig,
   applyOpenAIProviderConfig,
   OPENAI_DEFAULT_MODEL,
-} from "./openai-model-default.js";
+} from "../../extensions/openai/api.js";
+import type { OpenClawConfig } from "../config/config.js";
+import type { WizardPrompter } from "../wizard/prompts.js";
+import { applyDefaultModelChoice } from "./auth-choice.default-model.js";
 import {
   applyOpencodeZenModelDefault,
   OPENCODE_ZEN_DEFAULT_MODEL,
@@ -57,7 +57,7 @@ const SHARED_DEFAULT_MODEL_CASES: SharedDefaultModelCase[] = [
     apply: applyGoogleGeminiModelDefault,
     defaultModel: GOOGLE_GEMINI_DEFAULT_MODEL,
     overrideConfig: {
-      agents: { defaults: { model: { primary: "anthropic/claude-opus-4-5" } } },
+      agents: { defaults: { model: { primary: "anthropic/claude-opus-4-6" } } },
     } as OpenClawConfig,
     alreadyDefaultConfig: {
       agents: { defaults: { model: { primary: GOOGLE_GEMINI_DEFAULT_MODEL } } },
@@ -67,7 +67,7 @@ const SHARED_DEFAULT_MODEL_CASES: SharedDefaultModelCase[] = [
     apply: applyOpencodeZenModelDefault,
     defaultModel: OPENCODE_ZEN_DEFAULT_MODEL,
     overrideConfig: {
-      agents: { defaults: { model: "anthropic/claude-opus-4-5" } },
+      agents: { defaults: { model: "anthropic/claude-opus-4-6" } },
     } as OpenClawConfig,
     alreadyDefaultConfig: {
       agents: { defaults: { model: OPENCODE_ZEN_DEFAULT_MODEL } },
@@ -207,7 +207,7 @@ describe("applyOpencodeZenModelDefault", () => {
       agents: {
         defaults: {
           model: {
-            primary: "anthropic/claude-opus-4-5",
+            primary: "anthropic/claude-opus-4-6",
             fallbacks: ["google/gemini-3-pro"],
           },
         },
