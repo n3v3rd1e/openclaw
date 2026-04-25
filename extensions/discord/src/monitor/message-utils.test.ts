@@ -498,6 +498,45 @@ describe("resolveMediaList", () => {
     );
   });
 
+  it("downloads rawData attachments when Carbon attachments are missing", async () => {
+    const attachment = {
+      id: "att-raw-voice",
+      url: "https://cdn.discordapp.com/attachments/1/voice-message.ogg",
+      filename: "voice-message.ogg",
+      duration_secs: 252.9,
+    };
+    fetchRemoteMedia.mockResolvedValueOnce({
+      buffer: Buffer.from("voice"),
+      contentType: "audio/ogg",
+    });
+    saveMediaBuffer.mockResolvedValueOnce({
+      path: "/tmp/voice-message.ogg",
+      contentType: "audio/ogg",
+    });
+
+    const result = await resolveMediaList(
+      asMessage({
+        attachments: [],
+        rawData: { attachments: [attachment] },
+      }),
+      512,
+    );
+
+    expect(fetchRemoteMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: attachment.url,
+        filePathHint: attachment.filename,
+      }),
+    );
+    expect(result).toEqual([
+      {
+        path: "/tmp/voice-message.ogg",
+        contentType: "audio/ogg",
+        placeholder: "<media:audio>",
+      },
+    ]);
+  });
+
   it("keeps attachment metadata when download fails", async () => {
     const attachment = {
       id: "att-main-fallback",
@@ -898,6 +937,45 @@ describe("resolveDiscordMessageText", () => {
     );
 
     expect(text).toBe("<media:sticker> (1 sticker)");
+  });
+
+  it("uses audio placeholders for Discord voice attachments without content_type", () => {
+    const text = resolveDiscordMessageText(
+      asMessage({
+        content: "",
+        attachments: [
+          {
+            id: "voice-1",
+            url: "https://cdn.discordapp.com/attachments/1/voice-message.ogg",
+            filename: "voice-message.ogg",
+            duration_secs: 252.9,
+          },
+        ],
+      }),
+    );
+
+    expect(text).toBe("<media:audio> (1 audio)");
+  });
+
+  it("uses rawData attachments when Carbon attachments are missing", () => {
+    const text = resolveDiscordMessageText(
+      asMessage({
+        content: "",
+        attachments: [],
+        rawData: {
+          attachments: [
+            {
+              id: "voice-raw-1",
+              url: "https://cdn.discordapp.com/attachments/1/voice-message.ogg",
+              filename: "voice-message.ogg",
+              duration_secs: 252.9,
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(text).toBe("<media:audio> (1 audio)");
   });
 
   it("uses embed title when content is empty", () => {

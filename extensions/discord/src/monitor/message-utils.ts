@@ -206,6 +206,29 @@ export function resolveDiscordMessageStickers(message: Message): APIStickerItem[
   return normalizeStickerItems(rawData?.sticker_items ?? rawData?.stickers);
 }
 
+function normalizeDiscordAttachments(value: unknown): APIAttachment[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(
+    (entry): entry is APIAttachment =>
+      Boolean(entry) &&
+      typeof entry === "object" &&
+      typeof (entry as { id?: unknown }).id === "string" &&
+      (typeof (entry as { url?: unknown }).url === "string" ||
+        typeof (entry as { proxy_url?: unknown }).proxy_url === "string"),
+  );
+}
+
+export function resolveDiscordMessageAttachments(message: Message): APIAttachment[] {
+  const attachments = normalizeDiscordAttachments(message.attachments);
+  if (attachments.length > 0) {
+    return attachments;
+  }
+  const rawData = (message as { rawData?: { attachments?: unknown } }).rawData;
+  return normalizeDiscordAttachments(rawData?.attachments);
+}
+
 function resolveDiscordSnapshotStickers(snapshot: DiscordSnapshotMessage): APIStickerItem[] {
   return normalizeStickerItems(snapshot.stickers ?? snapshot.sticker_items);
 }
@@ -222,7 +245,7 @@ export async function resolveMediaList(
   const out: DiscordMediaInfo[] = [];
   const resolvedSsrFPolicy = resolveDiscordMediaSsrFPolicy(options?.ssrfPolicy);
   await appendResolvedMediaFromAttachments({
-    attachments: message.attachments ?? [],
+    attachments: resolveDiscordMessageAttachments(message),
     maxBytes,
     out,
     errorPrefix: "discord: failed to download attachment",
@@ -544,16 +567,40 @@ async function appendResolvedMediaFromStickers(params: {
 
 function inferPlaceholder(attachment: APIAttachment): string {
   const mime = attachment.content_type ?? "";
-  if (mime.startsWith("image/")) {
+  if (mime.startsWith("image/") || isImageAttachment(attachment)) {
     return "<media:image>";
   }
-  if (mime.startsWith("video/")) {
+  if (mime.startsWith("video/") || isVideoAttachment(attachment)) {
     return "<media:video>";
   }
-  if (mime.startsWith("audio/")) {
+  if (mime.startsWith("audio/") || isAudioAttachment(attachment)) {
     return "<media:audio>";
   }
   return "<media:document>";
+}
+
+function isAudioAttachment(attachment: APIAttachment): boolean {
+  const mime = attachment.content_type ?? "";
+  if (mime.startsWith("audio/")) {
+    return true;
+  }
+  if (typeof (attachment as { duration_secs?: unknown }).duration_secs === "number") {
+    return true;
+  }
+  if (typeof (attachment as { waveform?: unknown }).waveform === "string") {
+    return true;
+  }
+  const name = normalizeLowercaseStringOrEmpty(attachment.filename);
+  return /\.(aac|aiff?|amr|flac|m4a|mp3|oga|ogg|opus|wav|weba|wma)$/.test(name);
+}
+
+function isVideoAttachment(attachment: APIAttachment): boolean {
+  const mime = attachment.content_type ?? "";
+  if (mime.startsWith("video/")) {
+    return true;
+  }
+  const name = normalizeLowercaseStringOrEmpty(attachment.filename);
+  return /\.(avi|m4v|mkv|mov|mp4|mpeg|mpg|ogv|webm|wmv)$/.test(name);
 }
 
 function isImageAttachment(attachment: APIAttachment): boolean {
@@ -573,6 +620,14 @@ function buildDiscordAttachmentPlaceholder(attachments?: APIAttachment[]): strin
     return "";
   }
   const count = attachments.length;
+  if (attachments.every(isAudioAttachment)) {
+    const suffix = count === 1 ? "audio" : "audio files";
+    return `<media:audio> (${count} ${suffix})`;
+  }
+  if (attachments.every(isVideoAttachment)) {
+    const suffix = count === 1 ? "video" : "videos";
+    return `<media:video> (${count} ${suffix})`;
+  }
   const allImages = attachments.every(isImageAttachment);
   const label = allImages ? "image" : "file";
   const suffix = count === 1 ? label : `${label}s`;
@@ -623,7 +678,7 @@ export function resolveDiscordMessageText(
   const rawText =
     normalizeOptionalString(message.content) ||
     buildDiscordMediaPlaceholder({
-      attachments: message.attachments ?? undefined,
+      attachments: resolveDiscordMessageAttachments(message),
       stickers: resolveDiscordMessageStickers(message),
     }) ||
     embedText ||

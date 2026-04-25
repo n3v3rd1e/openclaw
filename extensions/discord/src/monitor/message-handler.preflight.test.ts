@@ -942,6 +942,75 @@ describe("preflightDiscordMessage", () => {
     expect(result?.wasMentioned).toBe(false);
   });
 
+  it("uses Discord voice attachment metadata for guild audio preflight mention detection", async () => {
+    transcribeFirstAudioMock.mockResolvedValue("hey openclaw from voice");
+
+    const channelId = "channel-audio-voice-metadata-1";
+    const client = createGuildTextClient(channelId);
+
+    const message = createDiscordMessage({
+      id: "m-audio-voice-metadata-1",
+      channelId,
+      content: "",
+      attachments: [
+        {
+          id: "att-voice-1",
+          url: "https://cdn.discordapp.com/attachments/voice-message.ogg",
+          filename: "voice-message.ogg",
+          duration_secs: 252.9,
+        },
+      ],
+      author: {
+        id: "user-voice-1",
+        bot: false,
+        username: "Alice",
+      },
+    });
+
+    const result = await preflightDiscordMessage({
+      ...createPreflightArgs({
+        cfg: {
+          ...DEFAULT_PREFLIGHT_CFG,
+          messages: {
+            groupChat: {
+              mentionPatterns: ["openclaw"],
+            },
+          },
+        } as import("openclaw/plugin-sdk/config-runtime").OpenClawConfig,
+        discordConfig: {} as DiscordConfig,
+        data: createGuildEvent({
+          channelId,
+          guildId: "guild-voice-1",
+          author: message.author,
+          message,
+        }),
+        client,
+      }),
+      guildEntries: {
+        "guild-voice-1": {
+          channels: {
+            [channelId]: {
+              enabled: true,
+              requireMention: true,
+            },
+          },
+        },
+      },
+    });
+
+    expect(transcribeFirstAudioMock).toHaveBeenCalledTimes(1);
+    expect(transcribeFirstAudioMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ctx: expect.objectContaining({
+          MediaUrls: ["https://cdn.discordapp.com/attachments/voice-message.ogg"],
+          MediaTypes: [],
+        }),
+      }),
+    );
+    expect(result).not.toBeNull();
+    expect(result?.wasMentioned).toBe(true);
+  });
+
   it("uses attachment content_type for guild audio preflight mention detection", async () => {
     transcribeFirstAudioMock.mockResolvedValue("hey openclaw");
 
