@@ -1,14 +1,12 @@
 ---
-title: "Plugin Setup and Config"
-sidebarTitle: "Setup and Config"
 summary: "Setup wizards, setup-entry.ts, config schemas, and package.json metadata"
+title: "Plugin setup and config"
+sidebarTitle: "Setup and Config"
 read_when:
   - You are adding a setup wizard to a plugin
   - You need to understand setup-entry.ts vs index.ts
   - You are defining plugin config schemas or package.json openclaw metadata
 ---
-
-# Plugin Setup and Config
 
 Reference for plugin packaging (`package.json` metadata), manifests
 (`openclaw.plugin.json`), setup entries, and config schemas.
@@ -70,14 +68,14 @@ fields are required. The canonical publish snippets live in
 
 ### `openclaw` fields
 
-| Field        | Type       | Description                                                                                            |
-| ------------ | ---------- | ------------------------------------------------------------------------------------------------------ |
-| `extensions` | `string[]` | Entry point files (relative to package root)                                                           |
-| `setupEntry` | `string`   | Lightweight setup-only entry (optional)                                                                |
-| `channel`    | `object`   | Channel catalog metadata for setup, picker, quickstart, and status surfaces                            |
-| `providers`  | `string[]` | Provider ids registered by this plugin                                                                 |
-| `install`    | `object`   | Install hints: `npmSpec`, `localPath`, `defaultChoice`, `minHostVersion`, `allowInvalidConfigRecovery` |
-| `startup`    | `object`   | Startup behavior flags                                                                                 |
+| Field        | Type       | Description                                                                                                                 |
+| ------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `extensions` | `string[]` | Entry point files (relative to package root)                                                                                |
+| `setupEntry` | `string`   | Lightweight setup-only entry (optional)                                                                                     |
+| `channel`    | `object`   | Channel catalog metadata for setup, picker, quickstart, and status surfaces                                                 |
+| `providers`  | `string[]` | Provider ids registered by this plugin                                                                                      |
+| `install`    | `object`   | Install hints: `npmSpec`, `localPath`, `defaultChoice`, `minHostVersion`, `expectedIntegrity`, `allowInvalidConfigRecovery` |
+| `startup`    | `object`   | Startup behavior flags                                                                                                      |
 
 ### `openclaw.channel`
 
@@ -101,7 +99,7 @@ surfaces before runtime loads.
 | `selectionDocsOmitLabel`               | `boolean`  | Show the docs path directly instead of a labeled docs link in selection copy. |
 | `selectionExtras`                      | `string[]` | Extra short strings appended in selection copy.                               |
 | `markdownCapable`                      | `boolean`  | Marks the channel as markdown-capable for outbound formatting decisions.      |
-| `showConfigured`                       | `boolean`  | Controls whether configured-channel listing surfaces show this channel.       |
+| `exposure`                             | `object`   | Channel visibility controls for setup, configured lists, and docs surfaces.   |
 | `quickstartAllowFrom`                  | `boolean`  | Opt this channel into the standard quickstart `allowFrom` setup flow.         |
 | `forceAccountBinding`                  | `boolean`  | Require explicit account binding even when only one account exists.           |
 | `preferSessionLookupForAnnounceTarget` | `boolean`  | Prefer session lookup when resolving announce targets for this channel.       |
@@ -125,11 +123,25 @@ Example:
       "selectionDocsPrefix": "Guide:",
       "selectionExtras": ["Markdown"],
       "markdownCapable": true,
+      "exposure": {
+        "configured": true,
+        "setup": true,
+        "docs": true
+      },
       "quickstartAllowFrom": true
     }
   }
 }
 ```
+
+`exposure` supports:
+
+- `configured`: include the channel in configured/status-style listing surfaces
+- `setup`: include the channel in interactive setup/configure pickers
+- `docs`: mark the channel as public-facing in docs/navigation surfaces
+
+`showConfigured` and `showInSetup` remain supported as legacy aliases. Prefer
+`exposure`.
 
 ### `openclaw.install`
 
@@ -141,10 +153,36 @@ Example:
 | `localPath`                  | `string`             | Local development or bundled install path.                                       |
 | `defaultChoice`              | `"npm"` \| `"local"` | Preferred install source when both are available.                                |
 | `minHostVersion`             | `string`             | Minimum supported OpenClaw version in the form `>=x.y.z`.                        |
+| `expectedIntegrity`          | `string`             | Expected npm dist integrity string, usually `sha512-...`, for pinned installs.   |
 | `allowInvalidConfigRecovery` | `boolean`            | Lets bundled-plugin reinstall flows recover from specific stale-config failures. |
+
+Interactive onboarding also uses `openclaw.install` for install-on-demand
+surfaces. If your plugin exposes provider auth choices or channel setup/catalog
+metadata before runtime loads, onboarding can show that choice, prompt for npm
+vs local install, install or enable the plugin, then continue the selected
+flow. Npm onboarding choices require trusted catalog metadata with a registry
+`npmSpec`; exact versions and `expectedIntegrity` are optional pins. If
+`expectedIntegrity` is present, install/update flows enforce it. Keep the "what
+to show" metadata in `openclaw.plugin.json` and the "how to install it"
+metadata in `package.json`.
 
 If `minHostVersion` is set, install and manifest-registry loading both enforce
 it. Older hosts skip the plugin; invalid version strings are rejected.
+
+For pinned npm installs, keep the exact version in `npmSpec` and add the
+expected artifact integrity:
+
+```json
+{
+  "openclaw": {
+    "install": {
+      "npmSpec": "@wecom/wecom-openclaw-plugin@1.2.3",
+      "expectedIntegrity": "sha512-REPLACE_WITH_NPM_DIST_INTEGRITY",
+      "defaultChoice": "npm"
+    }
+  }
+}
+```
 
 `allowInvalidConfigRecovery` is not a general bypass for broken configs. It is
 for narrow bundled-plugin recovery only, so reinstall/setup can repair known
@@ -264,6 +302,12 @@ export default defineSetupPluginEntry(myChannelPlugin);
 
 This avoids loading heavy runtime code (crypto libraries, CLI registrations,
 background services) during setup flows.
+
+Bundled workspace channels that keep setup-safe exports in sidecar modules can
+use `defineBundledChannelSetupEntry(...)` from
+`openclaw/plugin-sdk/channel-entry-contract` instead of
+`defineSetupPluginEntry(...)`. That bundled contract also supports an optional
+`runtime` export so setup-time runtime wiring can stay lightweight and explicit.
 
 **When OpenClaw uses `setupEntry` instead of the full entry:**
 
@@ -508,6 +552,12 @@ openclaw plugins install <package-name>
   `npm install --ignore-scripts` (no lifecycle scripts). Keep plugin dependency
   trees pure JS/TS and avoid packages that require `postinstall` builds.
 </Info>
+
+Bundled OpenClaw-owned plugins are the only startup repair exception: when a
+packaged install sees one enabled by plugin config, legacy channel config, or
+its bundled default-enabled manifest, startup installs that plugin's missing
+runtime dependencies before import. Third-party plugins should not rely on
+startup installs; keep using the explicit plugin installer.
 
 ## Related
 

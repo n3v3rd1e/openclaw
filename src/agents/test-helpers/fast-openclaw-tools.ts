@@ -32,13 +32,14 @@ const coreTools = [
   stubActionTool("session_status", ["get", "show"]),
   stubTool("tts"),
   stubTool("image_generate"),
+  stubTool("video_generate"),
   stubTool("web_fetch"),
   stubTool("image"),
   stubTool("pdf"),
 ];
 
 vi.mock("../openclaw-tools.js", () => ({
-  createOpenClawTools: () => coreTools.map((tool) => ({ ...tool })),
+  createOpenClawTools: () => coreTools.map((tool) => Object.assign({}, tool)),
   __testing: {
     setDepsForTest: () => {},
   },

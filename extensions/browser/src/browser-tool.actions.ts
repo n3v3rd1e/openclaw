@@ -9,10 +9,12 @@ import {
   imageResultFromFile,
   jsonResult,
   loadConfig,
+  normalizeOptionalString,
+  readStringValue,
   resolveBrowserConfig,
   resolveProfile,
   wrapExternalContent,
-} from "./core-api.js";
+} from "./browser-tool.runtime.js";
 
 const browserToolActionDeps = {
   browserAct,
@@ -106,7 +108,7 @@ function formatConsoleToolResult(result: {
     content: [{ type: "text" as const, text: wrapped.wrappedText }],
     details: {
       ...wrapped.safeDetails,
-      targetId: typeof result.targetId === "string" ? result.targetId : undefined,
+      targetId: readStringValue(result.targetId),
       messageCount: Array.isArray(result.messages) ? result.messages.length : undefined,
     },
   };
@@ -133,7 +135,7 @@ function isChromeStaleTargetError(profile: string | undefined, err: unknown): bo
 function stripTargetIdFromActRequest(
   request: Parameters<typeof browserAct>[1],
 ): Parameters<typeof browserAct>[1] | null {
-  const targetId = typeof request.targetId === "string" ? request.targetId.trim() : undefined;
+  const targetId = normalizeOptionalString(request.targetId);
   if (!targetId) {
     return null;
   }
@@ -194,7 +196,7 @@ export async function executeSnapshotAction(params: {
   const refs: "aria" | "role" | undefined =
     input.refs === "aria" || input.refs === "role" ? input.refs : undefined;
   const hasMaxChars = Object.hasOwn(input, "maxChars");
-  const targetId = typeof input.targetId === "string" ? input.targetId.trim() : undefined;
+  const targetId = normalizeOptionalString(input.targetId);
   const limit =
     typeof input.limit === "number" && Number.isFinite(input.limit) ? input.limit : undefined;
   const maxChars =
@@ -205,8 +207,8 @@ export async function executeSnapshotAction(params: {
   const compact = typeof input.compact === "boolean" ? input.compact : undefined;
   const depth =
     typeof input.depth === "number" && Number.isFinite(input.depth) ? input.depth : undefined;
-  const selector = typeof input.selector === "string" ? input.selector.trim() : undefined;
-  const frame = typeof input.frame === "string" ? input.frame.trim() : undefined;
+  const selector = normalizeOptionalString(input.selector);
+  const frame = normalizeOptionalString(input.frame);
   const resolvedMaxChars =
     format === "ai"
       ? hasMaxChars
@@ -314,8 +316,8 @@ export async function executeConsoleAction(params: {
   proxyRequest: BrowserProxyRequest | null;
 }): Promise<AgentToolResult<unknown>> {
   const { input, baseUrl, profile, proxyRequest } = params;
-  const level = typeof input.level === "string" ? input.level.trim() : undefined;
-  const targetId = typeof input.targetId === "string" ? input.targetId.trim() : undefined;
+  const level = normalizeOptionalString(input.level);
+  const targetId = normalizeOptionalString(input.targetId);
   if (proxyRequest) {
     const result = (await proxyRequest({
       method: "GET",

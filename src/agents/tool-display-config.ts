@@ -249,6 +249,11 @@ export const TOOL_DISPLAY_CONFIG: ToolDisplayConfig = {
         },
       },
     },
+    update_plan: {
+      emoji: "🗺️",
+      title: "Update Plan",
+      detailKeys: ["explanation", "plan.0.step"],
+    },
     gateway: {
       emoji: "🔌",
       title: "Gateway",
@@ -256,140 +261,6 @@ export const TOOL_DISPLAY_CONFIG: ToolDisplayConfig = {
         restart: {
           label: "restart",
           detailKeys: ["reason", "delayMs"],
-        },
-      },
-    },
-    whatsapp_login: {
-      emoji: "🟢",
-      title: "WhatsApp Login",
-      actions: {
-        start: {
-          label: "start",
-        },
-        wait: {
-          label: "wait",
-        },
-      },
-    },
-    discord: {
-      emoji: "💬",
-      title: "Discord",
-      actions: {
-        react: {
-          label: "react",
-          detailKeys: ["channelId", "messageId", "emoji"],
-        },
-        reactions: {
-          label: "reactions",
-          detailKeys: ["channelId", "messageId"],
-        },
-        sticker: {
-          label: "sticker",
-          detailKeys: ["to", "stickerIds"],
-        },
-        poll: {
-          label: "poll",
-          detailKeys: ["question", "to"],
-        },
-        permissions: {
-          label: "permissions",
-          detailKeys: ["channelId"],
-        },
-        readMessages: {
-          label: "read messages",
-          detailKeys: ["channelId", "limit"],
-        },
-        sendMessage: {
-          label: "send",
-          detailKeys: ["to", "content"],
-        },
-        editMessage: {
-          label: "edit",
-          detailKeys: ["channelId", "messageId"],
-        },
-        deleteMessage: {
-          label: "delete",
-          detailKeys: ["channelId", "messageId"],
-        },
-        threadCreate: {
-          label: "thread create",
-          detailKeys: ["channelId", "name"],
-        },
-        threadList: {
-          label: "thread list",
-          detailKeys: ["guildId", "channelId"],
-        },
-        threadReply: {
-          label: "thread reply",
-          detailKeys: ["channelId", "content"],
-        },
-        pinMessage: {
-          label: "pin",
-          detailKeys: ["channelId", "messageId"],
-        },
-        unpinMessage: {
-          label: "unpin",
-          detailKeys: ["channelId", "messageId"],
-        },
-        listPins: {
-          label: "list pins",
-          detailKeys: ["channelId"],
-        },
-        searchMessages: {
-          label: "search",
-          detailKeys: ["guildId", "content"],
-        },
-        memberInfo: {
-          label: "member",
-          detailKeys: ["guildId", "userId"],
-        },
-        roleInfo: {
-          label: "roles",
-          detailKeys: ["guildId"],
-        },
-        emojiList: {
-          label: "emoji list",
-          detailKeys: ["guildId"],
-        },
-        roleAdd: {
-          label: "role add",
-          detailKeys: ["guildId", "userId", "roleId"],
-        },
-        roleRemove: {
-          label: "role remove",
-          detailKeys: ["guildId", "userId", "roleId"],
-        },
-        channelInfo: {
-          label: "channel",
-          detailKeys: ["channelId"],
-        },
-        channelList: {
-          label: "channels",
-          detailKeys: ["guildId"],
-        },
-        voiceStatus: {
-          label: "voice",
-          detailKeys: ["guildId", "userId"],
-        },
-        eventList: {
-          label: "events",
-          detailKeys: ["guildId"],
-        },
-        eventCreate: {
-          label: "event create",
-          detailKeys: ["guildId", "name"],
-        },
-        timeout: {
-          label: "timeout",
-          detailKeys: ["guildId", "userId"],
-        },
-        kick: {
-          label: "kick",
-          detailKeys: ["guildId", "userId"],
-        },
-        ban: {
-          label: "ban",
-          detailKeys: ["guildId", "userId"],
         },
       },
     },
@@ -416,7 +287,17 @@ export const TOOL_DISPLAY_CONFIG: ToolDisplayConfig = {
     sessions_list: {
       emoji: "🗂️",
       title: "Sessions",
-      detailKeys: ["kinds", "limit", "activeMinutes", "messageLimit"],
+      detailKeys: [
+        "kinds",
+        "label",
+        "agentId",
+        "search",
+        "limit",
+        "activeMinutes",
+        "includeDerivedTitles",
+        "includeLastMessage",
+        "messageLimit",
+      ],
     },
     sessions_send: {
       emoji: "📨",
@@ -628,6 +509,42 @@ export const TOOL_DISPLAY_CONFIG: ToolDisplayConfig = {
         generate: {
           label: "generate",
           detailKeys: ["prompt", "model", "count", "resolution", "aspectRatio"],
+        },
+        list: {
+          label: "list",
+          detailKeys: ["provider", "model"],
+        },
+      },
+    },
+    music_generate: {
+      emoji: "🎵",
+      title: "Music Generation",
+      actions: {
+        generate: {
+          label: "generate",
+          detailKeys: ["prompt", "model", "durationSeconds", "format", "instrumental"],
+        },
+        list: {
+          label: "list",
+          detailKeys: ["provider", "model"],
+        },
+      },
+    },
+    video_generate: {
+      emoji: "🎬",
+      title: "Video Generation",
+      actions: {
+        generate: {
+          label: "generate",
+          detailKeys: [
+            "prompt",
+            "model",
+            "durationSeconds",
+            "resolution",
+            "aspectRatio",
+            "audio",
+            "watermark",
+          ],
         },
         list: {
           label: "list",

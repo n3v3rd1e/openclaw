@@ -11,6 +11,14 @@ import {
 } from "../profile-capabilities.js";
 import { toBoolean, toNumber, toStringOrEmpty } from "./utils.js";
 
+function readStringValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  return readStringValue(value)?.trim() || undefined;
+}
+
 export type BrowserSnapshotPlan = {
   format: "ai" | "aria";
   mode?: "efficient";
@@ -41,14 +49,13 @@ export function resolveSnapshotPlan(params: {
     explicitFormat,
     mode,
   });
-  const limitRaw = typeof params.query.limit === "string" ? Number(params.query.limit) : undefined;
+  const limitRaw = readStringValue(params.query.limit);
   const hasMaxChars = Object.hasOwn(params.query, "maxChars");
-  const maxCharsRaw =
-    typeof params.query.maxChars === "string" ? Number(params.query.maxChars) : undefined;
-  const limit = Number.isFinite(limitRaw) ? limitRaw : undefined;
+  const maxCharsRaw = readStringValue(params.query.maxChars);
+  const limit = Number.isFinite(Number(limitRaw)) ? Number(limitRaw) : undefined;
   const maxChars =
-    typeof maxCharsRaw === "number" && Number.isFinite(maxCharsRaw) && maxCharsRaw > 0
-      ? Math.floor(maxCharsRaw)
+    Number.isFinite(Number(maxCharsRaw)) && Number(maxCharsRaw) > 0
+      ? Math.floor(Number(maxCharsRaw))
       : undefined;
   const resolvedMaxChars =
     format === "ai"
@@ -68,8 +75,8 @@ export function resolveSnapshotPlan(params: {
   const compact = compactRaw ?? (mode === "efficient" ? true : undefined);
   const depth =
     depthRaw ?? (mode === "efficient" ? DEFAULT_AI_SNAPSHOT_EFFICIENT_DEPTH : undefined);
-  const selectorValue = toStringOrEmpty(params.query.selector).trim() || undefined;
-  const frameSelectorValue = toStringOrEmpty(params.query.frame).trim() || undefined;
+  const selectorValue = normalizeOptionalString(toStringOrEmpty(params.query.selector));
+  const frameSelectorValue = normalizeOptionalString(toStringOrEmpty(params.query.frame));
 
   return {
     format,

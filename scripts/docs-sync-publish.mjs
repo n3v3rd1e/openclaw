@@ -9,20 +9,116 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 const SOURCE_DOCS_DIR = path.join(ROOT, "docs");
 const SOURCE_CONFIG_PATH = path.join(SOURCE_DOCS_DIR, "docs.json");
+const SYNC_SUPPORT_FILES = [
+  {
+    source: path.join(ROOT, "scripts", "check-docs-mdx.mjs"),
+    target: path.join(".openclaw-sync", "check-docs-mdx.mjs"),
+  },
+  {
+    source: path.join(ROOT, ".github", "codex", "prompts", "docs-mdx-repair.md"),
+    target: path.join(".openclaw-sync", "docs-mdx-repair.md"),
+  },
+];
 const GENERATED_LOCALES = [
   {
     language: "zh-Hans",
     dir: "zh-CN",
     navFile: "zh-Hans-navigation.json",
     tmFile: "zh-CN.tm.jsonl",
+    navMode: "overlay",
   },
-  { language: "ja", dir: "ja-JP", navFile: "ja-navigation.json", tmFile: "ja-JP.tm.jsonl" },
-  { language: "es", dir: "es", navFile: "es-navigation.json", tmFile: "es.tm.jsonl" },
-  { language: "pt-BR", dir: "pt-BR", navFile: "pt-BR-navigation.json", tmFile: "pt-BR.tm.jsonl" },
-  { language: "ko", dir: "ko", navFile: "ko-navigation.json", tmFile: "ko.tm.jsonl" },
-  { language: "de", dir: "de", navFile: "de-navigation.json", tmFile: "de.tm.jsonl" },
-  { language: "fr", dir: "fr", navFile: "fr-navigation.json", tmFile: "fr.tm.jsonl" },
-  { language: "ar", dir: "ar", navFile: "ar-navigation.json", tmFile: "ar.tm.jsonl" },
+  {
+    language: "ja",
+    dir: "ja-JP",
+    navFile: "ja-navigation.json",
+    tmFile: "ja-JP.tm.jsonl",
+    navMode: "clone-en",
+  },
+  {
+    language: "es",
+    dir: "es",
+    navFile: "es-navigation.json",
+    tmFile: "es.tm.jsonl",
+    navMode: "clone-en",
+  },
+  {
+    language: "pt-BR",
+    dir: "pt-BR",
+    navFile: "pt-BR-navigation.json",
+    tmFile: "pt-BR.tm.jsonl",
+    navMode: "clone-en",
+  },
+  {
+    language: "ko",
+    dir: "ko",
+    navFile: "ko-navigation.json",
+    tmFile: "ko.tm.jsonl",
+    navMode: "clone-en",
+  },
+  {
+    language: "de",
+    dir: "de",
+    navFile: "de-navigation.json",
+    tmFile: "de.tm.jsonl",
+    navMode: "clone-en",
+  },
+  {
+    language: "fr",
+    dir: "fr",
+    navFile: "fr-navigation.json",
+    tmFile: "fr.tm.jsonl",
+    navMode: "clone-en",
+  },
+  {
+    language: "ar",
+    dir: "ar",
+    navFile: "ar-navigation.json",
+    tmFile: "ar.tm.jsonl",
+    navMode: "clone-en",
+  },
+  {
+    language: "it",
+    dir: "it",
+    navFile: "it-navigation.json",
+    tmFile: "it.tm.jsonl",
+    navMode: "clone-en",
+  },
+  {
+    language: "tr",
+    dir: "tr",
+    navFile: "tr-navigation.json",
+    tmFile: "tr.tm.jsonl",
+    navMode: "clone-en",
+  },
+  {
+    language: "uk",
+    dir: "uk",
+    navFile: "uk-navigation.json",
+    tmFile: "uk.tm.jsonl",
+    navMode: "clone-en",
+  },
+  {
+    language: "id",
+    dir: "id",
+    navFile: "id-navigation.json",
+    tmFile: "id.tm.jsonl",
+    navMode: "clone-en",
+  },
+  {
+    language: "pl",
+    dir: "pl",
+    navFile: "pl-navigation.json",
+    tmFile: "pl.tm.jsonl",
+    navMode: "clone-en",
+  },
+  {
+    language: "th",
+    dir: "th",
+    navFile: "th-navigation.json",
+    tmFile: "th.tm.jsonl",
+    navMode: "clone-en",
+    navigation: false,
+  },
 ];
 
 function parseArgs(argv) {
@@ -71,6 +167,28 @@ function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
+function walkMarkdownFiles(entryPath, out = []) {
+  if (!fs.existsSync(entryPath)) {
+    return out;
+  }
+
+  const stat = fs.statSync(entryPath);
+  if (stat.isFile()) {
+    if (/\.mdx?$/i.test(entryPath)) {
+      out.push(entryPath);
+    }
+    return out;
+  }
+
+  for (const entry of fs.readdirSync(entryPath, { withFileTypes: true })) {
+    if (entry.name === "node_modules" || entry.name === ".git") {
+      continue;
+    }
+    walkMarkdownFiles(path.join(entryPath, entry.name), out);
+  }
+  return out;
+}
+
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
@@ -78,6 +196,60 @@ function readJson(filePath) {
 function writeJson(filePath, value) {
   ensureDir(path.dirname(filePath));
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function prefixLocalePage(entry, localeDir) {
+  if (typeof entry === "string") {
+    return `${localeDir}/${entry}`;
+  }
+  if (Array.isArray(entry)) {
+    return entry.map((item) => prefixLocalePage(item, localeDir));
+  }
+  if (!entry || typeof entry !== "object") {
+    return entry;
+  }
+
+  const clone = { ...entry };
+  if (typeof clone.page === "string") {
+    clone.page = `${localeDir}/${clone.page}`;
+  }
+  if (Array.isArray(clone.pages)) {
+    clone.pages = clone.pages.map((item) => prefixLocalePage(item, localeDir));
+  }
+  return clone;
+}
+
+function cloneEnglishLanguageNav(englishNav, locale) {
+  if (!englishNav) {
+    throw new Error("docs/docs.json is missing navigation.languages.en");
+  }
+  return {
+    ...englishNav,
+    language: locale.language,
+    tabs: Array.isArray(englishNav.tabs)
+      ? englishNav.tabs.map((tab) => ({
+          ...tab,
+          pages: Array.isArray(tab.pages)
+            ? tab.pages.map((entry) => prefixLocalePage(entry, locale.dir))
+            : tab.pages,
+          groups: Array.isArray(tab.groups)
+            ? tab.groups.map((group) => ({
+                ...group,
+                pages: Array.isArray(group.pages)
+                  ? group.pages.map((entry) => prefixLocalePage(entry, locale.dir))
+                  : group.pages,
+              }))
+            : tab.groups,
+        }))
+      : englishNav.tabs,
+  };
+}
+
+function composeLocaleNav(locale, englishNav) {
+  if (locale.navMode === "clone-en") {
+    return cloneEnglishLanguageNav(englishNav, locale);
+  }
+  return readJson(path.join(SOURCE_DOCS_DIR, ".i18n", locale.navFile));
 }
 
 function composeDocsConfig() {
@@ -88,11 +260,14 @@ function composeDocsConfig() {
     throw new Error("docs/docs.json is missing navigation.languages");
   }
 
-  const generatedLanguageSet = new Set(GENERATED_LOCALES.map((entry) => entry.language));
+  const englishNav = languages.find((entry) => entry?.language === "en");
+  const generatedLanguageSet = new Set(
+    GENERATED_LOCALES.filter((entry) => entry.navigation !== false).map((entry) => entry.language),
+  );
   const withoutGenerated = languages.filter((entry) => !generatedLanguageSet.has(entry?.language));
   const enIndex = withoutGenerated.findIndex((entry) => entry?.language === "en");
-  const generated = GENERATED_LOCALES.map((entry) =>
-    readJson(path.join(SOURCE_DOCS_DIR, ".i18n", entry.navFile)),
+  const generated = GENERATED_LOCALES.filter((entry) => entry.navigation !== false).map((entry) =>
+    composeLocaleNav(entry, englishNav),
   );
   if (enIndex === -1) {
     withoutGenerated.push(...generated);
@@ -107,6 +282,75 @@ function composeDocsConfig() {
       languages: withoutGenerated,
     },
   };
+}
+
+function repairMintlifyAccordionIndentation(raw) {
+  const lines = raw.split(/\r?\n/u);
+  const accordionStack = [];
+  let inCodeFence = false;
+  let changed = false;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^\s*(```|~~~)/u.test(line)) {
+      inCodeFence = !inCodeFence;
+      continue;
+    }
+    if (inCodeFence) {
+      continue;
+    }
+
+    const openAccordion = line.match(/^(\s*)<Accordion\b/u);
+    if (openAccordion) {
+      accordionStack.push({
+        indent: openAccordion[1].length,
+        hasOutdentedListItem: false,
+      });
+      continue;
+    }
+
+    const listItem = line.match(/^(\s*)[-*+]\s+/u);
+    if (listItem) {
+      for (const accordion of accordionStack) {
+        if (listItem[1].length < accordion.indent) {
+          accordion.hasOutdentedListItem = true;
+        }
+      }
+    }
+
+    const closeAccordion = line.match(/^(\s*)<\/Accordion>/u);
+    if (!closeAccordion) {
+      continue;
+    }
+
+    const opening = accordionStack.pop();
+    if (opening && opening.hasOutdentedListItem && closeAccordion[1].length > opening.indent) {
+      lines[index] = `${" ".repeat(opening.indent)}${line.slice(closeAccordion[1].length)}`;
+      changed = true;
+    }
+  }
+
+  return changed ? lines.join("\n") : raw;
+}
+
+function repairGeneratedLocaleDocs(targetDocsDir) {
+  let repaired = 0;
+  for (const locale of GENERATED_LOCALES) {
+    const localeDir = path.join(targetDocsDir, locale.dir);
+    for (const filePath of walkMarkdownFiles(localeDir)) {
+      const raw = fs.readFileSync(filePath, "utf8");
+      const repairedRaw = repairMintlifyAccordionIndentation(raw);
+      if (repairedRaw === raw) {
+        continue;
+      }
+      fs.writeFileSync(filePath, repairedRaw);
+      repaired += 1;
+    }
+  }
+
+  if (repaired > 0) {
+    console.log(`Repaired Mintlify accordion indentation in ${repaired} generated locale doc(s).`);
+  }
 }
 
 function syncDocsTree(targetRoot) {
@@ -145,6 +389,7 @@ function syncDocsTree(targetRoot) {
     }
   }
 
+  repairGeneratedLocaleDocs(targetDocsDir);
   writeJson(path.join(targetDocsDir, "docs.json"), composeDocsConfig());
 }
 
@@ -157,6 +402,14 @@ function writeSyncMetadata(targetRoot, args) {
   writeJson(path.join(targetRoot, ".openclaw-sync", "source.json"), metadata);
 }
 
+function syncSupportFiles(targetRoot) {
+  for (const entry of SYNC_SUPPORT_FILES) {
+    const targetPath = path.join(targetRoot, entry.target);
+    ensureDir(path.dirname(targetPath));
+    fs.copyFileSync(entry.source, targetPath);
+  }
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const targetRoot = path.resolve(args.target);
@@ -166,6 +419,7 @@ function main() {
   }
 
   syncDocsTree(targetRoot);
+  syncSupportFiles(targetRoot);
   writeSyncMetadata(targetRoot, args);
 }
 

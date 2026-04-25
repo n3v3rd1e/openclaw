@@ -1,4 +1,4 @@
-import type { ChannelConfigUiHint } from "openclaw/plugin-sdk/core";
+import type { ChannelConfigUiHint } from "openclaw/plugin-sdk/channel-core";
 
 export const telegramChannelConfigUiHints = {
   "": {
@@ -33,6 +33,38 @@ export const telegramChannelConfigUiHints = {
     label: "Telegram Streaming Mode",
     help: 'Unified Telegram stream preview mode: "off" | "partial" | "block" | "progress" (default: "partial"). "progress" maps to "partial" on Telegram. Legacy boolean/streamMode keys are auto-mapped.',
   },
+  "streaming.mode": {
+    label: "Telegram Streaming Mode",
+    help: 'Canonical Telegram preview mode: "off" | "partial" | "block" | "progress" (default: "partial"). "progress" maps to "partial" on Telegram.',
+  },
+  "streaming.chunkMode": {
+    label: "Telegram Chunk Mode",
+    help: 'Chunking mode for outbound Telegram text delivery: "length" (default) or "newline".',
+  },
+  "streaming.block.enabled": {
+    label: "Telegram Block Streaming Enabled",
+    help: 'Enable chunked block-style Telegram preview delivery when channels.telegram.streaming.mode="block".',
+  },
+  "streaming.block.coalesce": {
+    label: "Telegram Block Streaming Coalesce",
+    help: "Merge streamed Telegram block replies before sending final delivery.",
+  },
+  "streaming.preview.chunk.minChars": {
+    label: "Telegram Draft Chunk Min Chars",
+    help: 'Minimum chars before emitting a Telegram block preview chunk when channels.telegram.streaming.mode="block".',
+  },
+  "streaming.preview.chunk.maxChars": {
+    label: "Telegram Draft Chunk Max Chars",
+    help: 'Target max size for a Telegram block preview chunk when channels.telegram.streaming.mode="block".',
+  },
+  "streaming.preview.chunk.breakPreference": {
+    label: "Telegram Draft Chunk Break Preference",
+    help: "Preferred breakpoints for Telegram draft chunks (paragraph | newline | sentence).",
+  },
+  "streaming.preview.toolProgress": {
+    label: "Telegram Draft Tool Progress",
+    help: "Show tool/progress activity in the live draft preview message (default: true). Set false to keep tool updates as separate messages.",
+  },
   "retry.attempts": {
     label: "Telegram Retry Attempts",
     help: "Max retry attempts for outbound Telegram API calls (default: 3).",
@@ -60,6 +92,10 @@ export const telegramChannelConfigUiHints = {
   timeoutSeconds: {
     label: "Telegram API Timeout (seconds)",
     help: "Max seconds before Telegram API requests are aborted (default: 500 per grammY).",
+  },
+  pollingStallThresholdMs: {
+    label: "Telegram Polling Stall Threshold (ms)",
+    help: "Milliseconds without completed Telegram getUpdates liveness before the polling watchdog restarts the polling runner. Default: 120000.",
   },
   silentErrorReplies: {
     label: "Telegram Silent Error Replies",

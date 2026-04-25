@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { format } from "node:util";
 import type { Command } from "commander";
+import { normalizeOptionalLowercaseString } from "openclaw/plugin-sdk/text-runtime";
 import { sleep } from "../api.js";
 import type { VoiceCallConfig } from "./config.js";
 import type { VoiceCallRuntime } from "./runtime.js";
@@ -28,7 +29,7 @@ function writeStdoutJson(value: unknown): void {
 }
 
 function resolveMode(input: string): "off" | "serve" | "funnel" {
-  const raw = input.trim().toLowerCase();
+  const raw = normalizeOptionalLowercaseString(input) ?? "";
   if (raw === "serve" || raw === "off") {
     return raw;
   }
@@ -54,7 +55,7 @@ function percentile(values: number[], p: number): number {
   if (values.length === 0) {
     return 0;
   }
-  const sorted = [...values].sort((a, b) => a - b);
+  const sorted = [...values].toSorted((a, b) => a - b);
   const idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
   return sorted[idx] ?? 0;
 }
@@ -198,6 +199,20 @@ export function registerVoiceCallCli(params: {
     });
 
   root
+    .command("dtmf")
+    .description("Send DTMF digits to an active call")
+    .requiredOption("--call-id <id>", "Call ID")
+    .requiredOption("--digits <digits>", "DTMF digits")
+    .action(async (options: { callId: string; digits: string }) => {
+      const rt = await ensureRuntime();
+      const result = await rt.manager.sendDtmf(options.callId, options.digits);
+      if (!result.success) {
+        throw new Error(result.error || "dtmf failed");
+      }
+      writeStdoutJson(result);
+    });
+
+  root
     .command("end")
     .description("Hang up an active call")
     .requiredOption("--call-id <id>", "Call ID")
@@ -326,8 +341,8 @@ export function registerVoiceCallCli(params: {
       async (options: { mode?: string; port?: string; path?: string; servePath?: string }) => {
         const mode = resolveMode(options.mode ?? "funnel");
         const servePort = Number(options.port ?? config.serve.port ?? 3334);
-        const servePath = String(options.servePath ?? config.serve.path ?? "/voice/webhook");
-        const tsPath = String(options.path ?? config.tailscale?.path ?? servePath);
+        const servePath = options.servePath ?? config.serve.path ?? "/voice/webhook";
+        const tsPath = options.path ?? config.tailscale?.path ?? servePath;
 
         const localUrl = `http://127.0.0.1:${servePort}`;
 

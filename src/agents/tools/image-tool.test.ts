@@ -1,3 +1,4 @@
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -11,14 +12,14 @@ import type {
 } from "../../plugin-sdk/media-understanding.js";
 import { withFetchPreconnect } from "../../test-utils/fetch-mock.js";
 import { minimaxUnderstandImage } from "../minimax-vlm.js";
+import { createOpenClawCodingTools } from "../pi-tools.js";
 import type { SandboxFsBridge } from "../sandbox/fs-bridge.js";
 import { createHostSandboxFsBridge } from "../test-helpers/host-sandbox-fs-bridge.js";
 import { createUnsafeMountedSandbox } from "../test-helpers/unsafe-mounted-sandbox.js";
 import { makeZeroUsageSnapshot } from "../usage.js";
 import { __testing, createImageTool, resolveImageModelConfigForTool } from "./image-tool.js";
 
-type PiToolsModule = typeof import("../pi-tools.js");
-type CreateOpenClawCodingToolsArgs = Parameters<PiToolsModule["createOpenClawCodingTools"]>[0];
+type CreateOpenClawCodingToolsArgs = Parameters<typeof createOpenClawCodingTools>[0];
 type MockOpenClawToolsOptions = {
   config?: OpenClawConfig;
   agentDir?: string;
@@ -91,6 +92,56 @@ vi.mock("../pi-tools.abort.js", () => ({
   wrapToolWithAbortSignal: vi.fn((tool) => tool),
 }));
 
+vi.mock("../auth-profiles.js", () => ({
+  ensureAuthProfileStore: (agentDir?: string) => {
+    if (!agentDir) {
+      return { version: 1, profiles: {} };
+    }
+    const pathname = path.join(agentDir, "auth-profiles.json");
+    try {
+      return JSON.parse(fsSync.readFileSync(pathname, "utf8")) as {
+        version?: number;
+        profiles?: Record<string, { provider?: string }>;
+      };
+    } catch {
+      return { version: 1, profiles: {} };
+    }
+  },
+  hasAnyAuthProfileStoreSource: (agentDir?: string) => {
+    if (!agentDir) {
+      return false;
+    }
+    return fsSync.existsSync(path.join(agentDir, "auth-profiles.json"));
+  },
+  listProfilesForProvider: (
+    store: { profiles?: Record<string, { provider?: string }> },
+    provider: string,
+  ) => Object.values(store.profiles ?? {}).filter((profile) => profile?.provider === provider),
+}));
+
+vi.mock("../model-auth.js", () => ({
+  resolveEnvApiKey: (provider: string) => {
+    const envVarByProvider: Record<string, string[]> = {
+      anthropic: ["ANTHROPIC_API_KEY", "ANTHROPIC_OAUTH_TOKEN"],
+      minimax: ["MINIMAX_API_KEY", "MINIMAX_OAUTH_TOKEN"],
+      "minimax-portal": ["MINIMAX_OAUTH_TOKEN"],
+      moonshot: ["MOONSHOT_API_KEY"],
+      openai: ["OPENAI_API_KEY"],
+      openrouter: ["OPENROUTER_API_KEY"],
+      zai: ["ZAI_API_KEY", "Z_AI_API_KEY"],
+    };
+    const envVar = (envVarByProvider[provider] ?? []).find((key) => {
+      const value = process.env[key];
+      return typeof value === "string" && value.length > 0;
+    });
+    return {
+      apiKey: envVar ? process.env[envVar] : undefined,
+      source: envVar ? "env" : undefined,
+      envVar,
+    };
+  },
+}));
+
 vi.mock("../openclaw-tools.js", async () => {
   const { createImageTool } = await import("./image-tool.js");
   return {
@@ -124,8 +175,6 @@ async function writeAuthProfiles(agentDir: string, profiles: unknown) {
 }
 
 async function createOpenClawCodingToolsWithFreshModules(options?: CreateOpenClawCodingToolsArgs) {
-  vi.resetModules();
-  const freshImageTool = await import("./image-tool.js");
   const defaultImageModels = new Map<string, string>([
     ["anthropic", "claude-opus-4-6"],
     ["minimax", "MiniMax-VL-01"],
@@ -133,7 +182,7 @@ async function createOpenClawCodingToolsWithFreshModules(options?: CreateOpenCla
     ["openai", "gpt-5.4-mini"],
     ["zai", "glm-4.6v"],
   ]);
-  freshImageTool.__testing.setProviderDepsForTest({
+  __testing.setProviderDepsForTest({
     buildProviderRegistry: (overrides?: Record<string, MediaUnderstandingProvider>) =>
       imageProviderHarness.buildProviderRegistry(overrides),
     getMediaUnderstandingProvider: (
@@ -147,7 +196,6 @@ async function createOpenClawCodingToolsWithFreshModules(options?: CreateOpenCla
     resolveDefaultMediaModel: ({ providerId, capability }) =>
       capability === "image" ? defaultImageModels.get(providerId.toLowerCase()) : undefined,
   });
-  const { createOpenClawCodingTools } = await import("../pi-tools.js");
   return createOpenClawCodingTools(options);
 }
 
@@ -657,6 +705,35 @@ describe("image tool implicit imageModel config", () => {
         primary: "acme/vision-1",
       });
       expect(createImageTool({ config: cfg, agentDir })).not.toBeNull();
+    });
+  });
+
+  it("does not double-prefix custom provider model IDs that already include the provider", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      await writeAuthProfiles(agentDir, {
+        version: 1,
+        profiles: {
+          "kimchi:default": { type: "api_key", provider: "kimchi", key: "sk-test" },
+        },
+      });
+      const cfg: OpenClawConfig = {
+        agents: { defaults: { model: { primary: "kimchi/text-1" } } },
+        models: {
+          providers: {
+            kimchi: {
+              baseUrl: "https://example.com",
+              models: [
+                makeModelDefinition("kimchi/text-1", ["text"]),
+                makeModelDefinition("kimchi/vision-1", ["text", "image"]),
+              ],
+            },
+          },
+        },
+      };
+
+      expect(resolveImageModelConfigForTool({ cfg, agentDir })).toEqual({
+        primary: "kimchi/vision-1",
+      });
     });
   });
 
@@ -1176,6 +1253,19 @@ describe("image tool data URL support", () => {
       /Unsupported data URL type/i,
     );
   });
+
+  it("rejects oversized data URLs before decoding", () => {
+    const oversizedBase64 = "A".repeat(16);
+    const dataUrl = `data:image/png;base64,${oversizedBase64}`;
+    const bufferFromSpy = vi.spyOn(Buffer, "from");
+
+    try {
+      expect(() => __testing.decodeDataUrl(dataUrl, { maxBytes: 4 })).toThrow(/size limit/i);
+      expect(bufferFromSpy).not.toHaveBeenCalledWith(oversizedBase64, "base64");
+    } finally {
+      bufferFromSpy.mockRestore();
+    }
+  });
 });
 
 describe("image tool MiniMax VLM routing", () => {
@@ -1220,9 +1310,7 @@ describe("image tool MiniMax VLM routing", () => {
     const [url, init] = fetch.mock.calls[0];
     expect(String(url)).toBe("https://api.minimax.io/v1/coding_plan/vlm");
     expect(init?.method).toBe("POST");
-    expect(String((init?.headers as Record<string, string>)?.Authorization)).toBe(
-      "Bearer minimax-test",
-    );
+    expect((init?.headers as Record<string, string>)?.Authorization).toBe("Bearer minimax-test");
     expect(String(init?.body)).toContain('"prompt":"Describe the image."');
     expect(String(init?.body)).toContain('"image_url":"data:image/png;base64,');
 
@@ -1379,5 +1467,115 @@ describe("image tool response validation", () => {
       } as never,
     });
     expect(text).toBe("hello");
+  });
+
+  it.each(["reasoning_content", "reasoning", "reasoning_details", "reasoning_text"])(
+    "detects %s as a retryable image reasoning-only response",
+    (thinkingSignature) => {
+      const message = createAssistantMessage({
+        content: [
+          {
+            type: "thinking",
+            thinking: "  <think>private</think> maybe a cat  ",
+            thinkingSignature,
+          },
+        ],
+      });
+      expect(__testing.hasImageReasoningOnlyResponse(message as never)).toBe(true);
+      expect(() =>
+        __testing.coerceImageAssistantText({
+          provider: "openai",
+          model: "gpt-5.4-mini",
+          message: message as never,
+        }),
+      ).toThrow(/returned no text/i);
+    },
+  );
+
+  it.each([
+    JSON.stringify({ id: "rs_123", type: "reasoning" }),
+    { id: "rs_456", type: "reasoning.encrypted" },
+  ])(
+    "detects Responses reasoning signature as a retryable image reasoning-only response",
+    (thinkingSignature) => {
+      const message = createAssistantMessage({
+        content: [
+          {
+            type: "thinking",
+            thinking: "  <think>private</think> maybe a cat  ",
+            thinkingSignature,
+          },
+        ],
+      });
+      expect(__testing.hasImageReasoningOnlyResponse(message as never)).toBe(true);
+      expect(() =>
+        __testing.coerceImageAssistantText({
+          provider: "openai",
+          model: "gpt-5.4-mini",
+          message: message as never,
+        }),
+      ).toThrow(/returned no text/i);
+    },
+  );
+
+  it("detects oversized JSON reasoning signatures without parsing the whole payload", () => {
+    const message = createAssistantMessage({
+      content: [
+        {
+          type: "thinking",
+          thinking: "retryable",
+          thinkingSignature: JSON.stringify({
+            id: "rs_123",
+            summary: [{ text: "x".repeat(2_100) }],
+            type: "reasoning",
+          }),
+        },
+      ],
+    });
+
+    expect(__testing.hasImageReasoningOnlyResponse(message as never)).toBe(true);
+  });
+
+  it("ignores oversized JSON signatures without Responses reasoning markers", () => {
+    const message = createAssistantMessage({
+      content: [
+        {
+          type: "thinking",
+          thinking: "retryable",
+          thinkingSignature: `{"id":"not-reasoning","summary":"${"x".repeat(2_100)}"}`,
+        },
+      ],
+    });
+
+    expect(__testing.hasImageReasoningOnlyResponse(message as never)).toBe(false);
+  });
+
+  it("detects signed reasoning-only responses with empty summary text", () => {
+    const message = createAssistantMessage({
+      content: [
+        {
+          type: "thinking",
+          thinking: "",
+          thinkingSignature: "reasoning_content",
+        },
+      ],
+    });
+
+    expect(__testing.hasImageReasoningOnlyResponse(message as never)).toBe(true);
+  });
+
+  it("bounds reasoning-only detection before scanning every block", () => {
+    const message = createAssistantMessage({
+      content: [
+        ...Array.from({ length: 50 }, () => ({ type: "thinking", thinking: "untagged" })),
+        {
+          type: "thinking",
+          thinking: "retryable",
+          thinkingSignature: "reasoning_content",
+        },
+      ],
+    });
+
+    expect(__testing.hasImageReasoningOnlyResponse(message as never)).toBe(false);
   });
 });

@@ -141,6 +141,17 @@ describe("sanitizeUserFacingText", () => {
     );
   });
 
+  it("returns a model-switch hint for OpenAI model capacity errors", () => {
+    expect(
+      sanitizeUserFacingText(
+        "OpenAI error: Selected model is at capacity. Please try a different model.",
+        {
+          errorContext: true,
+        },
+      ),
+    ).toBe("⚠️ Selected model is at capacity. Try a different model, or wait and retry.");
+  });
+
   it("returns a transport-specific message for prefixed ECONNREFUSED errors", () => {
     expect(
       sanitizeUserFacingText("Error: connect ECONNREFUSED 127.0.0.1:443", {
@@ -389,8 +400,8 @@ describe("sanitizeToolCallId", () => {
     it("strips all non-alphanumeric characters", () => {
       expect(sanitizeToolCallId("call_abc-123", "strict")).toBe("callabc123");
       expect(sanitizeToolCallId("call_abc|item:456", "strict")).toBe("callabcitem456");
-      expect(sanitizeToolCallId("whatsapp_login_1768799841527_1", "strict")).toBe(
-        "whatsapplogin17687998415271",
+      expect(sanitizeToolCallId("plugin_login_1768799841527_1", "strict")).toBe(
+        "pluginlogin17687998415271",
       );
     });
   });
@@ -439,7 +450,6 @@ describe("downgradeOpenAIReasoningBlocks", () => {
       },
     ];
 
-    // oxlint-disable-next-line typescript/no-explicit-any
     expect(downgradeOpenAIReasoningBlocks(input as any)).toEqual(input);
   });
 
@@ -457,7 +467,6 @@ describe("downgradeOpenAIReasoningBlocks", () => {
       { role: "user", content: "next" },
     ];
 
-    // oxlint-disable-next-line typescript/no-explicit-any
     expect(downgradeOpenAIReasoningBlocks(input as any)).toEqual([
       { role: "user", content: "next" },
     ]);
@@ -476,7 +485,6 @@ describe("downgradeOpenAIReasoningBlocks", () => {
       },
     ];
 
-    // oxlint-disable-next-line typescript/no-explicit-any
     expect(downgradeOpenAIReasoningBlocks(input as any)).toEqual([]);
   });
 
@@ -494,7 +502,6 @@ describe("downgradeOpenAIReasoningBlocks", () => {
       },
     ];
 
-    // oxlint-disable-next-line typescript/no-explicit-any
     expect(downgradeOpenAIReasoningBlocks(input as any)).toEqual(input);
   });
 
@@ -512,9 +519,7 @@ describe("downgradeOpenAIReasoningBlocks", () => {
       { role: "user", content: "next" },
     ];
 
-    // oxlint-disable-next-line typescript/no-explicit-any
     const once = downgradeOpenAIReasoningBlocks(input as any);
-    // oxlint-disable-next-line typescript/no-explicit-any
     const twice = downgradeOpenAIReasoningBlocks(once as any);
     expect(twice).toEqual(once);
   });
@@ -559,7 +564,6 @@ describe("downgradeOpenAIFunctionCallReasoningPairs", () => {
       makeToolResult(callIdWithReasoning, "ok"),
     ];
 
-    // oxlint-disable-next-line typescript/no-explicit-any
     expect(downgradeOpenAIFunctionCallReasoningPairs(input as any)).toEqual([
       makePlainAssistantTurn(callIdWithoutReasoning),
       makeToolResult(callIdWithoutReasoning, "ok"),
@@ -572,7 +576,6 @@ describe("downgradeOpenAIFunctionCallReasoningPairs", () => {
       makeToolResult(callIdWithReasoning, "ok"),
     ];
 
-    // oxlint-disable-next-line typescript/no-explicit-any
     expect(downgradeOpenAIFunctionCallReasoningPairs(input as any)).toEqual(input);
   });
 
@@ -584,7 +587,6 @@ describe("downgradeOpenAIFunctionCallReasoningPairs", () => {
       makeToolResult(callIdWithReasoning, "turn2"),
     ];
 
-    // oxlint-disable-next-line typescript/no-explicit-any
     expect(downgradeOpenAIFunctionCallReasoningPairs(input as any)).toEqual([
       makePlainAssistantTurn(callIdWithoutReasoning),
       makeToolResult(callIdWithoutReasoning, "turn1"),

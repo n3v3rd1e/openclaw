@@ -3,7 +3,7 @@ summary: "CLI reference for `openclaw hooks` (agent hooks)"
 read_when:
   - You want to manage agent hooks
   - You want to inspect hook availability or enable workspace hooks
-title: "hooks"
+title: "Hooks"
 ---
 
 # `openclaw hooks`
@@ -24,6 +24,7 @@ openclaw hooks list
 ```
 
 List all discovered hooks from workspace, managed, extra, and bundled directories.
+Gateway startup does not load internal hook handlers until at least one internal hook is configured.
 
 **Options:**
 

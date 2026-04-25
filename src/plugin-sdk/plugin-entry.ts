@@ -1,12 +1,18 @@
-import type { OpenClawConfig } from "../config/config.js";
+import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { emptyPluginConfigSchema } from "../plugins/config-schema.js";
+import type { ProviderRuntimeModel } from "../plugins/provider-runtime-model.types.js";
 import type {
   AnyAgentTool,
+  AgentHarness,
   MediaUnderstandingProviderPlugin,
   OpenClawPluginApi,
   OpenClawPluginCommandDefinition,
   OpenClawPluginConfigSchema,
   OpenClawPluginDefinition,
+  OpenClawPluginNodeHostCommand,
+  OpenClawPluginReloadRegistration,
+  OpenClawPluginSecurityAuditCollector,
+  OpenClawPluginSecurityAuditContext,
   OpenClawPluginService,
   OpenClawPluginServiceContext,
   OpenClawPluginToolContext,
@@ -57,7 +63,7 @@ import type {
   ProviderTransportTurnState,
   ProviderToolSchemaDiagnostic,
   ProviderResolveUsageAuthContext,
-  ProviderRuntimeModel,
+  ProviderThinkingProfile,
   ProviderThinkingPolicyContext,
   ProviderValidateReplayTurnsContext,
   ProviderWebSocketSessionPolicy,
@@ -69,8 +75,13 @@ import { createCachedLazyValueGetter } from "./lazy-value.js";
 
 export type {
   AnyAgentTool,
+  AgentHarness,
   MediaUnderstandingProviderPlugin,
   OpenClawPluginApi,
+  OpenClawPluginNodeHostCommand,
+  OpenClawPluginReloadRegistration,
+  OpenClawPluginSecurityAuditCollector,
+  OpenClawPluginSecurityAuditContext,
   OpenClawPluginToolContext,
   OpenClawPluginToolFactory,
   PluginCommandContext,
@@ -109,11 +120,11 @@ export type {
   ProviderPrepareRuntimeAuthContext,
   ProviderSanitizeReplayHistoryContext,
   ProviderResolveUsageAuthContext,
+  ProviderThinkingProfile,
   ProviderResolveDynamicModelContext,
   ProviderResolveTransportTurnStateContext,
   ProviderResolveWebSocketSessionPolicyContext,
   ProviderNormalizeResolvedModelContext,
-  ProviderRuntimeModel,
   RealtimeTranscriptionProviderPlugin,
   ProviderTransportTurnState,
   SpeechProviderPlugin,
@@ -132,9 +143,10 @@ export type {
   OpenClawPluginDefinition,
   PluginLogger,
 };
+export type { ProviderRuntimeModel } from "../plugins/provider-runtime-model.types.js";
 export type { OpenClawConfig };
 
-export { emptyPluginConfigSchema } from "../plugins/config-schema.js";
+export { buildPluginConfigSchema, emptyPluginConfigSchema } from "../plugins/config-schema.js";
 
 /** Options for a plugin entry that registers providers, tools, commands, or services. */
 type DefinePluginEntryOptions = {
@@ -143,6 +155,9 @@ type DefinePluginEntryOptions = {
   description: string;
   kind?: OpenClawPluginDefinition["kind"];
   configSchema?: OpenClawPluginConfigSchema | (() => OpenClawPluginConfigSchema);
+  reload?: OpenClawPluginDefinition["reload"];
+  nodeHostCommands?: OpenClawPluginDefinition["nodeHostCommands"];
+  securityAuditCollectors?: OpenClawPluginDefinition["securityAuditCollectors"];
   register: (api: OpenClawPluginApi) => void;
 };
 
@@ -153,7 +168,10 @@ type DefinedPluginEntry = {
   description: string;
   configSchema: OpenClawPluginConfigSchema;
   register: NonNullable<OpenClawPluginDefinition["register"]>;
-} & Pick<OpenClawPluginDefinition, "kind">;
+} & Pick<
+  OpenClawPluginDefinition,
+  "kind" | "reload" | "nodeHostCommands" | "securityAuditCollectors"
+>;
 
 /**
  * Canonical entry helper for non-channel plugins.
@@ -168,6 +186,9 @@ export function definePluginEntry({
   description,
   kind,
   configSchema = emptyPluginConfigSchema,
+  reload,
+  nodeHostCommands,
+  securityAuditCollectors,
   register,
 }: DefinePluginEntryOptions): DefinedPluginEntry {
   const getConfigSchema = createCachedLazyValueGetter(configSchema);
@@ -176,6 +197,9 @@ export function definePluginEntry({
     name,
     description,
     ...(kind ? { kind } : {}),
+    ...(reload ? { reload } : {}),
+    ...(nodeHostCommands ? { nodeHostCommands } : {}),
+    ...(securityAuditCollectors ? { securityAuditCollectors } : {}),
     get configSchema() {
       return getConfigSchema();
     },

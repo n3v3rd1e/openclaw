@@ -1,8 +1,9 @@
-import { listBootstrapChannelPlugins } from "../channels/plugins/bootstrap-registry.js";
 import { normalizeChannelId } from "../channels/plugins/index.js";
+import { listChannelPlugins } from "../channels/plugins/registry.js";
+import { getActivePluginChannelRegistryVersion } from "../plugins/runtime.js";
 import { resolveAccountEntry } from "../routing/account-lookup.js";
 import { normalizeAccountId } from "../routing/session-key.js";
-import type { OpenClawConfig } from "./config.js";
+import type { ResolveMarkdownTableModeParams } from "./markdown-tables.types.js";
 import type { MarkdownTableMode } from "./types.base.js";
 
 type MarkdownConfigEntry = {
@@ -17,7 +18,7 @@ type MarkdownConfigSection = MarkdownConfigEntry & {
 
 function buildDefaultTableModes(): Map<string, MarkdownTableMode> {
   return new Map(
-    listBootstrapChannelPlugins()
+    listChannelPlugins()
       .flatMap((plugin) => {
         const defaultMarkdownTableMode = plugin.messaging?.defaultMarkdownTableMode;
         return defaultMarkdownTableMode ? [[plugin.id, defaultMarkdownTableMode] as const] : [];
@@ -27,9 +28,14 @@ function buildDefaultTableModes(): Map<string, MarkdownTableMode> {
 }
 
 let cachedDefaultTableModes: Map<string, MarkdownTableMode> | null = null;
+let cachedDefaultTableModesRegistryVersion: number | null = null;
 
 function getDefaultTableModes(): Map<string, MarkdownTableMode> {
-  cachedDefaultTableModes ??= buildDefaultTableModes();
+  const registryVersion = getActivePluginChannelRegistryVersion();
+  if (!cachedDefaultTableModes || cachedDefaultTableModesRegistryVersion !== registryVersion) {
+    cachedDefaultTableModes = buildDefaultTableModes();
+    cachedDefaultTableModesRegistryVersion = registryVersion;
+  }
   return cachedDefaultTableModes;
 }
 
@@ -74,11 +80,14 @@ function resolveMarkdownModeFromSection(
   return isMarkdownTableMode(sectionMode) ? sectionMode : undefined;
 }
 
-export function resolveMarkdownTableMode(params: {
-  cfg?: Partial<OpenClawConfig>;
-  channel?: string | null;
-  accountId?: string | null;
-}): MarkdownTableMode {
+export type {
+  ResolveMarkdownTableMode,
+  ResolveMarkdownTableModeParams,
+} from "./markdown-tables.types.js";
+
+export function resolveMarkdownTableMode(
+  params: ResolveMarkdownTableModeParams,
+): MarkdownTableMode {
   const channel = normalizeChannelId(params.channel);
   const defaultMode = channel ? (getDefaultTableModes().get(channel) ?? "code") : "code";
   if (!channel || !params.cfg) {

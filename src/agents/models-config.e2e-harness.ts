@@ -2,35 +2,75 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, vi } from "vitest";
 import { withTempHome as withTempHomeBase } from "../../test/helpers/temp-home.js";
-import type { OpenClawConfig } from "../config/config.js";
+import { clearConfigCache, clearRuntimeConfigSnapshot } from "../config/config.js";
+import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { resolveBundledPluginsDir } from "../plugins/bundled-dir.js";
 import { resetPluginLoaderTestStateForTest } from "../plugins/loader.test-fixtures.js";
 import { resetProviderRuntimeHookCacheForTest } from "../plugins/provider-runtime.js";
 import { resolveOwningPluginIdsForProvider } from "../plugins/providers.js";
 import type { MockFn } from "../test-utils/vitest-mock-fn.js";
-import { resetModelsJsonReadyCacheForTest } from "./models-config.js";
+import { resetModelsJsonReadyCacheForTest } from "./models-config-state.js";
 import { resolveImplicitProviders } from "./models-config.providers.implicit.js";
 
 export function withModelsTempHome<T>(fn: (home: string) => Promise<T>): Promise<T> {
-  return withTempHomeBase(fn, { prefix: "openclaw-models-" });
+  // Models-config tests do not exercise session persistence; skip draining
+  // unrelated session lock state during temp-home teardown.
+  return withTempHomeBase(fn, {
+    prefix: "openclaw-models-",
+    skipSessionCleanup: true,
+  });
 }
 
-export function installModelsConfigTestHooks(opts?: { restoreFetch?: boolean }) {
+export function installModelsConfigTestHooks(opts?: {
+  restoreFetch?: boolean;
+  resetPluginLoaderState?: boolean;
+  resetProviderRuntimeHookCache?: boolean;
+}) {
   let previousHome: string | undefined;
+  let previousOpenClawAgentDir: string | undefined;
+  let previousPiCodingAgentDir: string | undefined;
   const originalFetch = globalThis.fetch;
+  const shouldResetPluginLoaderState = opts?.resetPluginLoaderState !== false;
+  const shouldResetProviderRuntimeHookCache = opts?.resetProviderRuntimeHookCache !== false;
 
   beforeEach(() => {
     previousHome = process.env.HOME;
-    resetPluginLoaderTestStateForTest();
+    previousOpenClawAgentDir = process.env.OPENCLAW_AGENT_DIR;
+    previousPiCodingAgentDir = process.env.PI_CODING_AGENT_DIR;
+    delete process.env.OPENCLAW_AGENT_DIR;
+    delete process.env.PI_CODING_AGENT_DIR;
+    clearRuntimeConfigSnapshot();
+    clearConfigCache();
+    if (shouldResetPluginLoaderState) {
+      resetPluginLoaderTestStateForTest();
+    }
     resetModelsJsonReadyCacheForTest();
-    resetProviderRuntimeHookCacheForTest();
+    if (shouldResetProviderRuntimeHookCache) {
+      resetProviderRuntimeHookCacheForTest();
+    }
   });
 
   afterEach(() => {
     process.env.HOME = previousHome;
-    resetPluginLoaderTestStateForTest();
+    if (previousOpenClawAgentDir === undefined) {
+      delete process.env.OPENCLAW_AGENT_DIR;
+    } else {
+      process.env.OPENCLAW_AGENT_DIR = previousOpenClawAgentDir;
+    }
+    if (previousPiCodingAgentDir === undefined) {
+      delete process.env.PI_CODING_AGENT_DIR;
+    } else {
+      process.env.PI_CODING_AGENT_DIR = previousPiCodingAgentDir;
+    }
+    clearRuntimeConfigSnapshot();
+    clearConfigCache();
+    if (shouldResetPluginLoaderState) {
+      resetPluginLoaderTestStateForTest();
+    }
     resetModelsJsonReadyCacheForTest();
-    resetProviderRuntimeHookCacheForTest();
+    if (shouldResetProviderRuntimeHookCache) {
+      resetProviderRuntimeHookCacheForTest();
+    }
     if (opts?.restoreFetch && originalFetch) {
       globalThis.fetch = originalFetch;
     }
@@ -64,10 +104,15 @@ export function unsetEnv(vars: string[]) {
 }
 
 export const COPILOT_TOKEN_ENV_VARS = ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"];
+const COPILOT_DISCOVERY_ENV_VARS = [
+  ...COPILOT_TOKEN_ENV_VARS,
+  "OPENCLAW_TEST_ONLY_PROVIDER_PLUGIN_IDS",
+];
 
 export async function withUnsetCopilotTokenEnv<T>(fn: () => Promise<T>): Promise<T> {
-  return withTempEnv(COPILOT_TOKEN_ENV_VARS, async () => {
+  return withTempEnv(COPILOT_DISCOVERY_ENV_VARS, async () => {
     unsetEnv(COPILOT_TOKEN_ENV_VARS);
+    process.env.OPENCLAW_TEST_ONLY_PROVIDER_PLUGIN_IDS = "github-copilot";
     return fn();
   });
 }
@@ -89,8 +134,11 @@ export async function withCopilotGithubToken<T>(
   token: string,
   fn: (fetchMock: MockFn) => Promise<T>,
 ): Promise<T> {
-  return withTempEnv(["COPILOT_GITHUB_TOKEN"], async () => {
+  return withTempEnv(COPILOT_DISCOVERY_ENV_VARS, async () => {
     process.env.COPILOT_GITHUB_TOKEN = token;
+    delete process.env.GH_TOKEN;
+    delete process.env.GITHUB_TOKEN;
+    process.env.OPENCLAW_TEST_ONLY_PROVIDER_PLUGIN_IDS = "github-copilot";
     const fetchMock = mockCopilotTokenExchangeSuccess();
     return fn(fetchMock);
   });
@@ -125,6 +173,8 @@ export const MODELS_CONFIG_IMPLICIT_ENV_VARS = [
   "TOGETHER_API_KEY",
   "VOLCANO_ENGINE_API_KEY",
   "BYTEPLUS_API_KEY",
+  "CHUTES_API_KEY",
+  "CHUTES_OAUTH_TOKEN",
   "KILOCODE_API_KEY",
   "KIMI_API_KEY",
   "KIMICODE_API_KEY",
@@ -166,6 +216,8 @@ const TEST_PROVIDER_ENV_TO_PROVIDER_IDS: Record<string, string[]> = {
   AWS_SESSION_TOKEN: ["amazon-bedrock"],
   AWS_SHARED_CREDENTIALS_FILE: ["amazon-bedrock"],
   BYTEPLUS_API_KEY: ["byteplus"],
+  CHUTES_API_KEY: ["chutes"],
+  CHUTES_OAUTH_TOKEN: ["chutes"],
   CLOUD_ML_REGION: ["anthropic-vertex"],
   CLOUDFLARE_AI_GATEWAY_API_KEY: ["cloudflare-ai-gateway"],
   COPILOT_GITHUB_TOKEN: ["github-copilot"],
@@ -179,7 +231,7 @@ const TEST_PROVIDER_ENV_TO_PROVIDER_IDS: Record<string, string[]> = {
   HF_TOKEN: ["huggingface"],
   HUGGINGFACE_HUB_TOKEN: ["huggingface"],
   KILOCODE_API_KEY: ["kilocode"],
-  KIMI_API_KEY: ["moonshot"],
+  KIMI_API_KEY: ["moonshot", "kimi"],
   KIMICODE_API_KEY: ["kimi-coding"],
   MINIMAX_API_KEY: ["minimax"],
   MINIMAX_OAUTH_TOKEN: ["minimax"],
@@ -267,6 +319,15 @@ async function inferImplicitProviderTestPluginIds(params: {
       providerIds.add(providerId.trim());
     }
   }
+  const legacyGrokApiKey =
+    params.config?.tools?.web?.search &&
+    typeof params.config.tools.web.search === "object" &&
+    "grok" in params.config.tools.web.search
+      ? (params.config.tools.web.search.grok as { apiKey?: unknown } | undefined)?.apiKey
+      : undefined;
+  if (legacyGrokApiKey !== undefined && params.config?.plugins?.entries?.xai?.enabled !== false) {
+    providerIds.add("xai");
+  }
   for (const [envVar, mappedProviderIds] of Object.entries(TEST_PROVIDER_ENV_TO_PROVIDER_IDS)) {
     if (!params.env[envVar]?.trim()) {
       continue;
@@ -290,13 +351,6 @@ async function inferImplicitProviderTestPluginIds(params: {
       providerIds.add(pluginId);
     }
   }
-  const legacyGrokApiKey = (
-    params.config?.tools?.web?.search as { grok?: { apiKey?: unknown } } | undefined
-  )?.grok?.apiKey;
-  if (legacyGrokApiKey !== undefined && params.config?.plugins?.entries?.xai?.enabled !== false) {
-    providerIds.add("xai");
-  }
-
   if (providerIds.size === 0) {
     // No config/env/auth hints: keep ambient local auto-discovery focused on the
     // one provider that is expected to probe localhost in tests.

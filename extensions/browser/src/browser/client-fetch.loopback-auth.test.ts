@@ -1,5 +1,27 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "../../test-support/browser-security-runtime.mock.js";
 import type { BrowserDispatchResponse } from "./routes/dispatcher.js";
+
+vi.mock("openclaw/plugin-sdk/ssrf-runtime", async () => {
+  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/ssrf-runtime")>(
+    "openclaw/plugin-sdk/ssrf-runtime",
+  );
+  return {
+    ...actual,
+    fetchWithSsrFGuard: async (params: {
+      url: string;
+      init?: RequestInit;
+      signal?: AbortSignal;
+    }) => ({
+      response: await fetch(params.url, {
+        ...params.init,
+        signal: params.signal,
+      }),
+      finalUrl: params.url,
+      release: async () => {},
+    }),
+  };
+});
 
 function okDispatchResponse(): BrowserDispatchResponse {
   return { status: 200, body: { ok: true } };
@@ -49,7 +71,7 @@ vi.mock("./routes/dispatcher.js", () => ({
   })),
 }));
 
-let fetchBrowserJson: typeof import("./client-fetch.js").fetchBrowserJson;
+const { fetchBrowserJson } = await import("./client-fetch.js");
 
 function stubJsonFetchOk() {
   const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
@@ -85,12 +107,18 @@ async function expectThrownBrowserFetchError(
 }
 
 describe("fetchBrowserJson loopback auth", () => {
-  beforeAll(async () => {
-    ({ fetchBrowserJson } = await import("./client-fetch.js"));
-  });
-
   beforeEach(() => {
     vi.restoreAllMocks();
+    for (const key of [
+      "ALL_PROXY",
+      "all_proxy",
+      "HTTP_PROXY",
+      "http_proxy",
+      "HTTPS_PROXY",
+      "https_proxy",
+    ]) {
+      vi.stubEnv(key, "");
+    }
     vi.stubEnv("OPENCLAW_GATEWAY_TOKEN", "loopback-token");
     mocks.loadConfig.mockClear();
     mocks.loadConfig.mockReturnValue({

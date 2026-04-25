@@ -4,10 +4,8 @@ read_when:
   - Inspecting background work in progress or recently completed
   - Debugging delivery failures for detached agent runs
   - Understanding how background runs relate to sessions, cron, and heartbeat
-title: "Background Tasks"
+title: "Background tasks"
 ---
-
-# Background Tasks
 
 > **Looking for scheduling?** See [Automation & Tasks](/automation) for choosing the right mechanism. This page covers **tracking** background work, not scheduling it.
 
@@ -77,8 +75,13 @@ openclaw tasks flow cancel <lookup>
 | Subagent orchestration | `subagent`   | Spawning a subagent via `sessions_spawn`               | `done_only`           |
 | Cron jobs (all types)  | `cron`       | Every cron execution (main-session and isolated)       | `silent`              |
 | CLI operations         | `cli`        | `openclaw agent` commands that run through the gateway | `silent`              |
+| Agent media jobs       | `cli`        | Session-backed `video_generate` runs                   | `silent`              |
 
 Main-session cron tasks use `silent` notify policy by default — they create records for tracking but do not generate notifications. Isolated cron tasks also default to `silent` but are more visible because they run in their own session.
+
+Session-backed `video_generate` runs also use `silent` notify policy. They still create task records, but completion is handed back to the original agent session as an internal wake so the agent can write the follow-up message and attach the finished video itself. If you opt into `tools.media.asyncCompletion.directSend`, async `music_generate` and `video_generate` completions try direct channel delivery first before falling back to the requester-session wake path.
+
+While a session-backed `video_generate` task is still active, the tool also acts as a guardrail: repeated `video_generate` calls in that same session return the active task status instead of starting a second concurrent generation. Use `action: "status"` when you want an explicit progress/status lookup from the agent side.
 
 **What does not create tasks:**
 
@@ -175,7 +178,7 @@ The lookup token accepts a task ID, run ID, or session key. Shows the full recor
 openclaw tasks cancel <lookup>
 ```
 
-For ACP and subagent tasks, this kills the child session. Status transitions to `cancelled` and a delivery notification is sent.
+For ACP and subagent tasks, this kills the child session. For CLI-tracked tasks, cancellation is recorded in the task registry (there is no separate child runtime handle). Status transitions to `cancelled` and a delivery notification is sent when applicable.
 
 ### `tasks notify`
 
@@ -222,7 +225,7 @@ Completion cleanup is also runtime-aware:
 - Isolated cron completion best-effort closes tracked browser tabs/processes for the cron session before the run fully tears down.
 - Isolated cron delivery waits out descendant subagent follow-up when needed and
   suppresses stale parent acknowledgement text instead of announcing it.
-- Subagent completion delivery prefers the latest visible assistant text; if that is empty it falls back to sanitized latest tool/toolResult text, and timeout-only tool-call runs can collapse to a short partial-progress summary.
+- Subagent completion delivery prefers the latest visible assistant text; if that is empty it falls back to sanitized latest tool/toolResult text, and timeout-only tool-call runs can collapse to a short partial-progress summary. Terminal failed runs announce failure status without replaying captured reply text.
 - Cleanup failures do not mask the real task outcome.
 
 ### `tasks flow list|show|cancel`
@@ -296,7 +299,7 @@ See [Task Flow](/automation/taskflow) for details.
 
 ### Tasks and cron
 
-A cron job **definition** lives in `~/.openclaw/cron/jobs.json`. **Every** cron execution creates a task record — both main-session and isolated. Main-session cron tasks default to `silent` notify policy so they track without generating notifications.
+A cron job **definition** lives in `~/.openclaw/cron/jobs.json`; runtime execution state lives beside it in `~/.openclaw/cron/jobs-state.json`. **Every** cron execution creates a task record — both main-session and isolated. Main-session cron tasks default to `silent` notify policy so they track without generating notifications.
 
 See [Cron Jobs](/automation/cron-jobs).
 
@@ -320,4 +323,4 @@ A task's `runId` links to the agent run doing the work. Agent lifecycle events (
 - [Task Flow](/automation/taskflow) — flow orchestration above tasks
 - [Scheduled Tasks](/automation/cron-jobs) — scheduling background work
 - [Heartbeat](/gateway/heartbeat) — periodic main-session turns
-- [CLI: Tasks](/cli/index#tasks) — CLI command reference
+- [CLI: Tasks](/cli/tasks) — CLI command reference

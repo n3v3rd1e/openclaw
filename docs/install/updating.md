@@ -6,8 +6,6 @@ read_when:
 title: "Updating"
 ---
 
-# Updating
-
 Keep OpenClaw up to date.
 
 ## Recommended: `openclaw update`
@@ -53,6 +51,25 @@ pnpm add -g openclaw@latest
 ```bash
 bun add -g openclaw@latest
 ```
+
+### Root-owned global npm installs
+
+Some Linux npm setups install global packages under root-owned directories such as
+`/usr/lib/node_modules/openclaw`. OpenClaw supports that layout: the installed
+package is treated as read-only at runtime, and bundled plugin runtime
+dependencies are staged into a writable runtime directory instead of mutating the
+package tree.
+
+For hardened systemd units, set a writable stage directory that is included in
+`ReadWritePaths`:
+
+```ini
+Environment=OPENCLAW_PLUGIN_STAGE_DIR=/var/lib/openclaw/plugin-runtime-deps
+ReadWritePaths=/var/lib/openclaw /home/openclaw/.openclaw /tmp
+```
+
+If `OPENCLAW_PLUGIN_STAGE_DIR` is not set, OpenClaw uses `$STATE_DIRECTORY` when
+systemd provides it, then falls back to `~/.openclaw/plugin-runtime-deps`.
 
 ## Auto-updater
 
@@ -132,6 +149,7 @@ To return to latest: `git checkout main && git pull`.
 ## If you are stuck
 
 - Run `openclaw doctor` again and read the output carefully.
+- For `openclaw update --channel dev` on source checkouts, the updater auto-bootstraps `pnpm` when needed. If you see a pnpm/corepack bootstrap error, install `pnpm` manually (or re-enable `corepack`) and rerun the update.
 - Check: [Troubleshooting](/gateway/troubleshooting)
 - Ask in Discord: [https://discord.gg/clawd](https://discord.gg/clawd)
 

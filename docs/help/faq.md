@@ -6,8 +6,6 @@ read_when:
 title: "FAQ"
 ---
 
-# FAQ
-
 Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS, multi-agent, OAuth/API keys, model failover). For runtime diagnostics, see [Troubleshooting](/gateway/troubleshooting). For the full config reference, see [Configuration](/gateway/configuration).
 
 ## First 60 seconds if something is broken
@@ -160,7 +158,7 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
     cd openclaw
     pnpm install
     pnpm build
-    pnpm ui:build # auto-installs UI deps on first run
+    pnpm ui:build
     openclaw onboard
     ```
 
@@ -565,7 +563,7 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
   <Accordion title="What does onboarding actually do?">
     `openclaw onboard` is the recommended setup path. In **local mode** it walks you through:
 
-    - **Model/auth setup** (provider OAuth, Claude CLI reuse, and API keys supported, plus local model options such as LM Studio)
+    - **Model/auth setup** (provider OAuth, API keys, Anthropic setup-token, plus local model options such as LM Studio)
     - **Workspace** location + bootstrap files
     - **Gateway settings** (bind/port/auth/tailscale)
     - **Channels** (WhatsApp, Telegram, Discord, Mattermost, Signal, iMessage, plus bundled channel plugins like QQ Bot)
@@ -581,15 +579,17 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
     **local-only models** so your data stays on your device. Subscriptions (Claude
     Pro/Max or OpenAI Codex) are optional ways to authenticate those providers.
 
-    We believe Claude Code CLI fallback is likely allowed for local,
-    user-managed automation based on Anthropic's public CLI docs. That said,
-    Anthropic's third-party harness policy creates enough ambiguity around
-    subscription-backed use in external products that we do not recommend it
-    for production. Anthropic also notified OpenClaw users on **April 4, 2026
-    at 12:00 PM PT / 8:00 PM BST** that the **OpenClaw** Claude-login path
-    counts as third-party harness usage and now requires **Extra Usage**
-    billed separately from the subscription. OpenAI Codex OAuth is explicitly
-    supported for external tools like OpenClaw.
+    For Anthropic in OpenClaw, the practical split is:
+
+    - **Anthropic API key**: normal Anthropic API billing
+    - **Claude CLI / Claude subscription auth in OpenClaw**: Anthropic staff
+      told us this usage is allowed again, and OpenClaw is treating `claude -p`
+      usage as sanctioned for this integration unless Anthropic publishes a new
+      policy
+
+    For long-lived gateway hosts, Anthropic API keys are still the more
+    predictable setup. OpenAI Codex OAuth is explicitly supported for external
+    tools like OpenClaw.
 
     OpenClaw also supports other hosted subscription-style options including
     **Qwen Cloud Coding Plan**, **MiniMax Coding Plan**, and
@@ -603,45 +603,41 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
   </Accordion>
 
   <Accordion title="Can I use Claude Max subscription without an API key?">
-    Yes, via a local **Claude CLI** login on the gateway host.
+    Yes.
 
-    Claude Pro/Max subscriptions **do not include an API key**, so Claude CLI
-    reuse is the local fallback path in OpenClaw. We believe Claude Code CLI
-    fallback is likely allowed for local, user-managed automation based on
-    Anthropic's public CLI docs. That said, Anthropic's third-party harness
-    policy creates enough ambiguity around subscription-backed use in external
-    products that we do not recommend it for production. We recommend
-    Anthropic API keys instead.
+    Anthropic staff told us OpenClaw-style Claude CLI usage is allowed again, so
+    OpenClaw treats Claude subscription auth and `claude -p` usage as sanctioned
+    for this integration unless Anthropic publishes a new policy. If you want
+    the most predictable server-side setup, use an Anthropic API key instead.
 
   </Accordion>
 
   <Accordion title="Do you support Claude subscription auth (Claude Pro or Max)?">
-    Yes. Reuse a local **Claude CLI** login on the gateway host with `openclaw models auth login --provider anthropic --method cli --set-default`.
+    Yes.
 
-    Anthropic setup-token is also available again as a legacy/manual OpenClaw path. Anthropic's OpenClaw-specific billing notice still applies there, so use it with the expectation that Anthropic requires **Extra Usage**. See [Anthropic](/providers/anthropic) and [OAuth](/concepts/oauth).
+    Anthropic staff told us this usage is allowed again, so OpenClaw treats
+    Claude CLI reuse and `claude -p` usage as sanctioned for this integration
+    unless Anthropic publishes a new policy.
 
-    Important: We believe Claude Code CLI fallback is likely allowed for local,
-    user-managed automation based on Anthropic's public CLI docs. That said,
-    Anthropic's third-party harness policy creates enough ambiguity around
-    subscription-backed use in external products that we do not recommend it
-    for production. Anthropic also told OpenClaw users on **April 4, 2026 at
-    12:00 PM PT / 8:00 PM BST** that the **OpenClaw** Claude-login path
-    requires **Extra Usage** billed separately from the subscription.
-
-    For production or multi-user workloads, Anthropic API key auth is the
-    safer, recommended choice. If you want other subscription-style hosted
+    Anthropic setup-token is still available as a supported OpenClaw token path, but OpenClaw now prefers Claude CLI reuse and `claude -p` when available.
+    For production or multi-user workloads, Anthropic API key auth is still the
+    safer, more predictable choice. If you want other subscription-style hosted
     options in OpenClaw, see [OpenAI](/providers/openai), [Qwen / Model
-    Cloud](/providers/qwen), [MiniMax](/providers/minimax), and
-    [GLM Models](/providers/glm).
+    Cloud](/providers/qwen), [MiniMax](/providers/minimax), and [GLM
+    Models](/providers/glm).
 
   </Accordion>
 
+</AccordionGroup>
+
 <a id="why-am-i-seeing-http-429-ratelimiterror-from-anthropic"></a>
-<Accordion title="Why am I seeing HTTP 429 rate_limit_error from Anthropic?">
-That means your **Anthropic quota/rate limit** is exhausted for the current window. If you
-use **Claude CLI**, wait for the window to reset or upgrade your plan. If you
-use an **Anthropic API key**, check the Anthropic Console
-for usage/billing and raise limits as needed.
+
+<AccordionGroup>
+  <Accordion title="Why am I seeing HTTP 429 rate_limit_error from Anthropic?">
+    That means your **Anthropic quota/rate limit** is exhausted for the current window. If you
+    use **Claude CLI**, wait for the window to reset or upgrade your plan. If you
+    use an **Anthropic API key**, check the Anthropic Console
+    for usage/billing and raise limits as needed.
 
     If the message is specifically:
     `Extra usage is required for long context requests`, the request is trying to use
@@ -660,7 +656,42 @@ for usage/billing and raise limits as needed.
   </Accordion>
 
   <Accordion title="How does Codex auth work?">
-    OpenClaw supports **OpenAI Code (Codex)** via OAuth (ChatGPT sign-in). Onboarding can run the OAuth flow and will set the default model to `openai-codex/gpt-5.4` when appropriate. See [Model providers](/concepts/model-providers) and [Onboarding (CLI)](/start/wizard).
+    OpenClaw supports **OpenAI Code (Codex)** via OAuth (ChatGPT sign-in). Use
+    `openai-codex/gpt-5.5` for Codex OAuth through the default PI runner. Use
+    `openai/gpt-5.4` for current direct OpenAI API-key access. GPT-5.5 direct
+    API-key access is supported once OpenAI enables it on the public API; today
+    GPT-5.5 uses subscription/OAuth via `openai-codex/gpt-5.5` or native Codex
+    app-server runs with `openai/gpt-5.5` and `embeddedHarness.runtime: "codex"`.
+    See [Model providers](/concepts/model-providers) and [Onboarding (CLI)](/start/wizard).
+  </Accordion>
+
+  <Accordion title="Why does OpenClaw still mention openai-codex?">
+    `openai-codex` is the provider and auth-profile id for ChatGPT/Codex OAuth.
+    It is also the explicit PI model prefix for Codex OAuth:
+
+    - `openai/gpt-5.4` = current direct OpenAI API-key route in PI
+    - `openai/gpt-5.5` = future direct API-key route once OpenAI enables GPT-5.5 on the API
+    - `openai-codex/gpt-5.5` = Codex OAuth route in PI
+    - `openai/gpt-5.5` + `embeddedHarness.runtime: "codex"` = native Codex app-server route
+    - `openai-codex:...` = auth profile id, not a model ref
+
+    If you want the direct OpenAI Platform billing/limit path, set
+    `OPENAI_API_KEY`. If you want ChatGPT/Codex subscription auth, sign in with
+    `openclaw models auth login --provider openai-codex` and use
+    `openai-codex/*` model refs for PI runs.
+
+  </Accordion>
+
+  <Accordion title="Why can Codex OAuth limits differ from ChatGPT web?">
+    Codex OAuth uses OpenAI-managed, plan-dependent quota windows. In practice,
+    those limits can differ from the ChatGPT website/app experience, even when
+    both are tied to the same account.
+
+    OpenClaw can show the currently visible provider usage/quota windows in
+    `openclaw models status`, but it does not invent or normalize ChatGPT-web
+    entitlements into direct API access. If you want the direct OpenAI Platform
+    billing/limit path, use `openai/*` with an API key.
+
   </Accordion>
 
   <Accordion title="Do you support OpenAI subscription auth (Codex OAuth)?">
@@ -682,7 +713,7 @@ for usage/billing and raise limits as needed.
        - npm: `npm install -g @google/gemini-cli`
     2. Enable the plugin: `openclaw plugins enable google`
     3. Login: `openclaw models auth login --provider google-gemini-cli --set-default`
-    4. Default model after login: `google-gemini-cli/gemini-3.1-pro-preview`
+    4. Default model after login: `google-gemini-cli/gemini-3-flash-preview`
     5. If requests fail, set `GOOGLE_CLOUD_PROJECT` or `GOOGLE_CLOUD_PROJECT_ID` on the gateway host
 
     This stores OAuth tokens in auth profiles on the gateway host. Details: [Model providers](/concepts/model-providers).
@@ -748,7 +779,7 @@ for usage/billing and raise limits as needed.
   <Accordion title="Telegram: what goes in allowFrom?">
     `channels.telegram.allowFrom` is **the human sender's Telegram user ID** (numeric). It is not the bot username.
 
-    Onboarding accepts `@username` input and resolves it to a numeric ID, but OpenClaw authorization uses numeric IDs only.
+    Setup asks for numeric user IDs only. If you already have legacy `@username` entries in config, `openclaw doctor --fix` can try to resolve them.
 
     Safer (no third-party bot):
 
@@ -1075,15 +1106,14 @@ for usage/billing and raise limits as needed.
   <Accordion title="Cron fired, but nothing was sent to the channel. Why?">
     Check the delivery mode first:
 
-    - `--no-deliver` / `delivery.mode: "none"` means no external message is expected.
+    - `--no-deliver` / `delivery.mode: "none"` means no runner fallback send is expected.
     - Missing or invalid announce target (`channel` / `to`) means the runner skipped outbound delivery.
     - Channel auth failures (`unauthorized`, `Forbidden`) mean the runner tried to deliver but credentials blocked it.
     - A silent isolated result (`NO_REPLY` / `no_reply` only) is treated as intentionally non-deliverable, so the runner also suppresses queued fallback delivery.
 
-    For isolated cron jobs, the runner owns final delivery. The agent is expected
-    to return a plain-text summary for the runner to send. `--no-deliver` keeps
-    that result internal; it does not let the agent send directly with the
-    message tool instead.
+    For isolated cron jobs, the agent can still send directly with the `message`
+    tool when a chat route is available. `--announce` only controls the runner
+    fallback path for final text that the agent did not already send.
 
     Debug:
 
@@ -1239,7 +1269,7 @@ for usage/billing and raise limits as needed.
     openclaw browser --browser-profile chrome-live tabs
     ```
 
-    This path is host-local. If the Gateway runs elsewhere, either run a node host on the browser machine or use remote CDP instead.
+    This path can use the local host browser or a connected browser node. If the Gateway runs elsewhere, either run a node host on the browser machine or use remote CDP instead.
 
     Current limits on `existing-session` / `user`:
 
@@ -1274,7 +1304,7 @@ for usage/billing and raise limits as needed.
   <Accordion title="Can I keep DMs personal but make groups public/sandboxed with one agent?">
     Yes - if your private traffic is **DMs** and your public traffic is **groups**.
 
-    Use `agents.defaults.sandbox.mode: "non-main"` so group/channel sessions (non-main keys) run in Docker, while the main DM session stays on-host. Then restrict what tools are available in sandboxed sessions via `tools.sandbox.tools`.
+    Use `agents.defaults.sandbox.mode: "non-main"` so group/channel sessions (non-main keys) run in the configured sandbox backend, while the main DM session stays on-host. Docker is the default backend if you do not choose one. Then restrict what tools are available in sandboxed sessions via `tools.sandbox.tools`.
 
     Setup walkthrough + example config: [Groups: personal DMs + public groups](/channels/groups#pattern-personal-dms-public-groups-single-agent)
 
@@ -1392,8 +1422,9 @@ for usage/billing and raise limits as needed.
     These files live in the **agent workspace**, not `~/.openclaw`.
 
     - **Workspace (per agent)**: `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `USER.md`,
-      `MEMORY.md` (or legacy fallback `memory.md` when `MEMORY.md` is absent),
-      `memory/YYYY-MM-DD.md`, optional `HEARTBEAT.md`.
+      `MEMORY.md`, `memory/YYYY-MM-DD.md`, optional `HEARTBEAT.md`.
+      Lowercase root `memory.md` is legacy repair input only; `openclaw doctor --fix`
+      can merge it into `MEMORY.md` when both files exist.
     - **State dir (`~/.openclaw`)**: config, channel/provider state, auth profiles, sessions, logs,
       and shared skills (`~/.openclaw/skills`).
 
@@ -1610,10 +1641,20 @@ for usage/billing and raise limits as needed.
     `config.apply` replaces the **entire config**. If you send a partial object, everything
     else is removed.
 
+    Current OpenClaw protects many accidental clobbers:
+
+    - OpenClaw-owned config writes validate the full post-change config before writing.
+    - Invalid or destructive OpenClaw-owned writes are rejected and saved as `openclaw.json.rejected.*`.
+    - If a direct edit breaks startup or hot reload, the Gateway restores the last-known-good config and saves the rejected file as `openclaw.json.clobbered.*`.
+    - The main agent receives a boot warning after recovery so it does not blindly write the bad config again.
+
     Recover:
 
-    - Restore from backup (git or a copied `~/.openclaw/openclaw.json`).
-    - If you have no backup, re-run `openclaw doctor` and reconfigure channels/models.
+    - Check `openclaw logs --follow` for `Config auto-restored from last-known-good`, `Config write rejected:`, or `config reload restored last-known-good config`.
+    - Inspect the newest `openclaw.json.clobbered.*` or `openclaw.json.rejected.*` beside the active config.
+    - Keep the active restored config if it works, then copy only the intended keys back with `openclaw config set` or `config.patch`.
+    - Run `openclaw config validate` and `openclaw doctor`.
+    - If you have no last-known-good or rejected payload, restore from backup, or re-run `openclaw doctor` and reconfigure channels/models.
     - If this was unexpected, file a bug and include your last known config or any backup.
     - A local coding agent can often reconstruct a working config from logs or history.
 
@@ -1625,7 +1666,7 @@ for usage/billing and raise limits as needed.
     - Use `config.patch` for partial RPC edits; keep `config.apply` for full-config replacement only.
     - If you are using the owner-only `gateway` tool from an agent run, it will still reject writes to `tools.exec.ask` / `tools.exec.security` (including legacy `tools.bash.*` aliases that normalize to the same protected exec paths).
 
-    Docs: [Config](/cli/config), [Configure](/cli/configure), [Doctor](/gateway/doctor).
+    Docs: [Config](/cli/config), [Configure](/cli/configure), [Gateway troubleshooting](/gateway/troubleshooting#gateway-restored-last-known-good-config), [Doctor](/gateway/doctor).
 
   </Accordion>
 
@@ -1797,8 +1838,8 @@ for usage/billing and raise limits as needed.
 
     - `config.schema.lookup`: inspect one config subtree with its shallow schema node, matched UI hint, and immediate child summaries before writing
     - `config.get`: fetch the current snapshot + hash
-    - `config.patch`: safe partial update (preferred for most RPC edits)
-    - `config.apply`: validate + replace the full config, then restart
+    - `config.patch`: safe partial update (preferred for most RPC edits); hot-reloads when possible and restarts when required
+    - `config.apply`: validate + replace the full config; hot-reloads when possible and restarts when required
     - The owner-only `gateway` runtime tool still refuses to rewrite `tools.exec.ask` / `tools.exec.security`; legacy `tools.bash.*` aliases normalize to the same protected exec paths
 
   </Accordion>
@@ -2186,7 +2227,7 @@ for usage/billing and raise limits as needed.
     agents.defaults.model.primary
     ```
 
-    Models are referenced as `provider/model` (example: `openai/gpt-5.4`). If you omit the provider, OpenClaw first tries an alias, then a unique configured-provider match for that exact model id, and only then falls back to the configured default provider as a deprecated compatibility path. If that provider no longer exposes the configured default model, OpenClaw falls back to the first configured provider/model instead of surfacing a stale removed-provider default. You should still **explicitly** set `provider/model`.
+    Models are referenced as `provider/model` (example: `openai/gpt-5.4` or `openai-codex/gpt-5.5`). If you omit the provider, OpenClaw first tries an alias, then a unique configured-provider match for that exact model id, and only then falls back to the configured default provider as a deprecated compatibility path. If that provider no longer exposes the configured default model, OpenClaw falls back to the first configured provider/model instead of surfacing a stale removed-provider default. You should still **explicitly** set `provider/model`.
 
   </Accordion>
 
@@ -2235,7 +2276,7 @@ for usage/billing and raise limits as needed.
     Quickest setup:
 
     1. Install Ollama from `https://ollama.com/download`
-    2. Pull a local model such as `ollama pull glm-4.7-flash`
+    2. Pull a local model such as `ollama pull gemma4`
     3. If you want cloud models too, run `ollama signin`
     4. Run `openclaw onboard` and choose `Ollama`
     5. Pick `Local` or `Cloud + Local`
@@ -2308,14 +2349,47 @@ for usage/billing and raise limits as needed.
 
   </Accordion>
 
-  <Accordion title="Can I use GPT 5.2 for daily tasks and Codex 5.3 for coding?">
+  <Accordion title="Can I use GPT 5.5 for daily tasks and Codex 5.5 for coding?">
     Yes. Set one as default and switch as needed:
 
-    - **Quick switch (per session):** `/model gpt-5.4` for daily tasks, `/model openai-codex/gpt-5.4` for coding with Codex OAuth.
-    - **Default + switch:** set `agents.defaults.model.primary` to `openai/gpt-5.4`, then switch to `openai-codex/gpt-5.4` when coding (or the other way around).
+    - **Quick switch (per session):** `/model openai/gpt-5.4` for current direct OpenAI API-key tasks or `/model openai-codex/gpt-5.5` for GPT-5.5 Codex OAuth tasks.
+    - **Default:** set `agents.defaults.model.primary` to `openai/gpt-5.4` for API-key usage or `openai-codex/gpt-5.5` for GPT-5.5 Codex OAuth usage.
     - **Sub-agents:** route coding tasks to sub-agents with a different default model.
 
+    Direct API-key access for `openai/gpt-5.5` is supported once OpenAI enables
+    GPT-5.5 on the public API. Until then GPT-5.5 is subscription/OAuth-only.
+
     See [Models](/concepts/models) and [Slash commands](/tools/slash-commands).
+
+  </Accordion>
+
+  <Accordion title="How do I configure fast mode for GPT 5.5?">
+    Use either a session toggle or a config default:
+
+    - **Per session:** send `/fast on` while the session is using `openai/gpt-5.4` or `openai-codex/gpt-5.5`.
+    - **Per model default:** set `agents.defaults.models["openai/gpt-5.4"].params.fastMode` or `agents.defaults.models["openai-codex/gpt-5.5"].params.fastMode` to `true`.
+
+    Example:
+
+    ```json5
+    {
+      agents: {
+        defaults: {
+          models: {
+            "openai/gpt-5.4": {
+              params: {
+                fastMode: true,
+              },
+            },
+          },
+        },
+      },
+    }
+    ```
+
+    For OpenAI, fast mode maps to `service_tier = "priority"` on supported native Responses requests. Session `/fast` overrides beat config defaults.
+
+    See [Thinking and fast mode](/tools/thinking) and [OpenAI fast mode](/providers/openai#openai-fast-mode).
 
   </Accordion>
 
@@ -2401,7 +2475,7 @@ for usage/billing and raise limits as needed.
 
     - `opus` → `anthropic/claude-opus-4-6`
     - `sonnet` → `anthropic/claude-sonnet-4-6`
-    - `gpt` → `openai/gpt-5.4`
+    - `gpt` → `openai/gpt-5.4` for API-key setups, or `openai-codex/gpt-5.5` when configured for Codex OAuth
     - `gpt-mini` → `openai/gpt-5.4-mini`
     - `gpt-nano` → `openai/gpt-5.4-nano`
     - `gemini` → `google/gemini-3.1-pro-preview`
@@ -2615,7 +2689,7 @@ Related: [/concepts/oauth](/concepts/oauth) (OAuth flows, token storage, multi-a
     for one model can still be usable for a sibling model on the same provider,
     while billing/disabled windows still block the whole profile.
 
-    You can also set a **per-agent** order override (stored in that agent's `auth-profiles.json`) via the CLI:
+    You can also set a **per-agent** order override (stored in that agent's `auth-state.json`) via the CLI:
 
     ```bash
     # Defaults to the configured default agent (omit --agent)
@@ -2673,8 +2747,8 @@ Related: [/concepts/oauth](/concepts/oauth) (OAuth flows, token storage, multi-a
 
   </Accordion>
 
-  <Accordion title='Why does openclaw gateway status say "Runtime: running" but "RPC probe: failed"?'>
-    Because "running" is the **supervisor's** view (launchd/systemd/schtasks). The RPC probe is the CLI actually connecting to the gateway WebSocket and calling `status`.
+  <Accordion title='Why does openclaw gateway status say "Runtime: running" but "Connectivity probe: failed"?'>
+    Because "running" is the **supervisor's** view (launchd/systemd/schtasks). The connectivity probe is the CLI actually connecting to the gateway WebSocket.
 
     Use `openclaw gateway status` and trust these lines:
 
@@ -3137,13 +3211,14 @@ Related: [/concepts/oauth](/concepts/oauth) (OAuth flows, token storage, multi-a
 
 <AccordionGroup>
   <Accordion title="How do I stop internal system messages from showing in chat?">
-    Most internal or tool messages only appear when **verbose** or **reasoning** is enabled
+    Most internal or tool messages only appear when **verbose**, **trace**, or **reasoning** is enabled
     for that session.
 
     Fix in the chat where you see it:
 
     ```
     /verbose off
+    /trace off
     /reasoning off
     ```
 

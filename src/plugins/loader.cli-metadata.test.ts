@@ -5,6 +5,7 @@ import { loadOpenClawPluginCliRegistry, loadOpenClawPlugins } from "./loader.js"
 import {
   cleanupPluginLoaderFixturesForTest,
   EMPTY_PLUGIN_SCHEMA,
+  inlineChannelPluginEntryFactorySource,
   makeTempDir,
   resetPluginLoaderTestStateForTest,
   useNoBundledPlugins,
@@ -20,6 +21,51 @@ afterAll(() => {
 });
 
 describe("plugin loader CLI metadata", () => {
+  it("suppresses trust warning logs during CLI metadata loads", async () => {
+    useNoBundledPlugins();
+    const stateDir = makeTempDir();
+    const globalDir = path.join(stateDir, "extensions", "rogue");
+    fs.mkdirSync(globalDir, { recursive: true });
+    writePlugin({
+      id: "rogue",
+      dir: globalDir,
+      filename: "index.cjs",
+      body: `module.exports = {
+  id: "rogue",
+  register(api) {
+    api.registerCli(() => {}, {
+      descriptors: [
+        {
+          name: "rogue",
+          description: "Rogue CLI metadata",
+          hasSubcommands: true,
+        },
+      ],
+    });
+  },
+};`,
+    });
+
+    const warnings: string[] = [];
+    const registry = await loadOpenClawPluginCliRegistry({
+      env: { ...process.env, OPENCLAW_STATE_DIR: stateDir },
+      logger: {
+        info: () => {},
+        warn: (msg: string) => warnings.push(msg),
+        error: () => {},
+        debug: () => {},
+      },
+      config: {
+        plugins: {
+          enabled: true,
+        },
+      },
+    });
+
+    expect(warnings).toEqual([]);
+    expect(registry.cliRegistrars.flatMap((entry) => entry.commands)).toContain("rogue");
+  });
+
   it("passes validated plugin config into non-activating CLI metadata loads", async () => {
     useNoBundledPlugins();
     const plugin = writePlugin({
@@ -117,7 +163,7 @@ describe("plugin loader CLI metadata", () => {
     );
     fs.writeFileSync(
       path.join(pluginDir, "index.cjs"),
-      `const { defineChannelPluginEntry } = require("openclaw/plugin-sdk/core");
+      `${inlineChannelPluginEntryFactorySource()}
 require("node:fs").writeFileSync(${JSON.stringify(fullMarker)}, "loaded", "utf-8");
 module.exports = {
   ...defineChannelPluginEntry({
@@ -440,7 +486,7 @@ module.exports = {
     );
     fs.writeFileSync(
       path.join(pluginDir, "index.cjs"),
-      `const { defineChannelPluginEntry } = require("openclaw/plugin-sdk/core");
+      `${inlineChannelPluginEntryFactorySource()}
 module.exports = {
   ...defineChannelPluginEntry({
     id: "full-cli-metadata-channel",
@@ -503,7 +549,7 @@ module.exports = {
     );
   });
 
-  it("awaits async plugin registration when collecting CLI metadata", async () => {
+  it("rejects async plugin registration when collecting CLI metadata", async () => {
     useNoBundledPlugins();
     const plugin = writePlugin({
       id: "async-cli",
@@ -534,10 +580,11 @@ module.exports = {
       },
     });
 
-    expect(registry.cliRegistrars.flatMap((entry) => entry.commands)).toContain("async-cli");
-    expect(
-      registry.diagnostics.some((entry) => entry.message.includes("async registration is ignored")),
-    ).toBe(false);
+    expect(registry.cliRegistrars.flatMap((entry) => entry.commands)).not.toContain("async-cli");
+    const loaded = registry.plugins.find((entry) => entry.id === "async-cli");
+    expect(loaded?.status).toBe("error");
+    expect(loaded?.failurePhase).toBe("register");
+    expect(loaded?.error).toContain("plugin register must be synchronous");
   });
 
   it("applies memory slot gating to non-bundled CLI metadata loads", async () => {
@@ -590,7 +637,7 @@ module.exports = {
     );
     const memory = registry.plugins.find((entry) => entry.id === "memory-external");
     expect(memory?.status).toBe("disabled");
-    expect(String(memory?.error ?? "")).toContain('memory slot set to "memory-other"');
+    expect(memory?.error ?? "").toContain('memory slot set to "memory-other"');
   });
 
   it("re-evaluates memory slot gating after resolving exported plugin kind", async () => {
@@ -630,6 +677,6 @@ module.exports = {
     );
     const memory = registry.plugins.find((entry) => entry.id === "memory-export-only");
     expect(memory?.status).toBe("disabled");
-    expect(String(memory?.error ?? "")).toContain('memory slot set to "memory-other"');
+    expect(memory?.error ?? "").toContain('memory slot set to "memory-other"');
   });
 });
