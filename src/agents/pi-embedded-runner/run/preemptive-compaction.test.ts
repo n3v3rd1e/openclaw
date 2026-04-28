@@ -93,6 +93,42 @@ describe("preemptive-compaction", () => {
     expect(result.estimatedPromptTokens).toBeLessThan(result.promptBudgetBeforeReserve);
   });
 
+  it("requests compaction for high-utilization transcripts before hard overflow", () => {
+    const messages = [makeAssistantHistory(verboseHistory.repeat(7))];
+    const estimatedPromptTokens = estimatePrePromptTokens({
+      messages,
+      systemPrompt: "sys",
+      prompt: "hello",
+    });
+    const contextTokenBudget = Math.ceil(estimatedPromptTokens / 0.8);
+    const result = shouldPreemptivelyCompactBeforePrompt({
+      messages,
+      systemPrompt: "sys",
+      prompt: "hello",
+      contextTokenBudget,
+      reserveTokens: 1,
+    });
+
+    expect(result.overflowTokens).toBe(0);
+    expect(result.utilizationPressureTokens).toBeGreaterThan(0);
+    expect(result.shouldCompact).toBe(true);
+    expect(result.route).toBe("compact_only");
+    expect(result.utilizationThreshold).toBe(0.75);
+  });
+
+  it("clamps custom utilization thresholds to a safe range", () => {
+    const result = shouldPreemptivelyCompactBeforePrompt({
+      messages: [makeAssistantHistory("short history")],
+      systemPrompt: "sys",
+      prompt: "hello",
+      contextTokenBudget: 10_000,
+      reserveTokens: 1_000,
+      utilizationThreshold: 0.99,
+    });
+
+    expect(result.utilizationThreshold).toBe(0.95);
+  });
+
   it("caps reserve tokens so small context models keep usable prompt budget", () => {
     const result = shouldPreemptivelyCompactBeforePrompt({
       messages: [makeAssistantHistory("short history")],

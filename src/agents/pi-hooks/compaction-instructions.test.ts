@@ -15,8 +15,14 @@ describe("DEFAULT_COMPACTION_INSTRUCTIONS", () => {
     expect(DEFAULT_COMPACTION_INSTRUCTIONS).toContain("primary language");
   });
 
-  it("contains factual content directive", () => {
-    expect(DEFAULT_COMPACTION_INSTRUCTIONS).toContain("factual content");
+  it("contains durable-state directive", () => {
+    expect(DEFAULT_COMPACTION_INSTRUCTIONS).toContain("durable state");
+    expect(DEFAULT_COMPACTION_INSTRUCTIONS).toContain("verification run");
+  });
+
+  it("contains noise-dropping directive", () => {
+    expect(DEFAULT_COMPACTION_INSTRUCTIONS).toContain("Drop noise");
+    expect(DEFAULT_COMPACTION_INSTRUCTIONS).toContain("queued-message envelopes");
   });
 
   it("does not exceed MAX_INSTRUCTION_LENGTH (800 chars)", () => {

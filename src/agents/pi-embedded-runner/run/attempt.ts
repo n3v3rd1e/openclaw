@@ -2197,8 +2197,10 @@ export async function runEmbeddedAttempt(
                   estimatedPromptTokens: 0,
                   promptBudgetBeforeReserve: 0,
                   overflowTokens: 0,
+                  utilizationPressureTokens: 0,
                   toolResultReducibleChars: 0,
                   effectiveReserveTokens: reserveTokens,
+                  utilizationThreshold: 0.75,
                 }
               : shouldPreemptivelyCompactBeforePrompt({
                   messages: activeSession.messages,
@@ -2239,8 +2241,10 @@ export async function runEmbeddedAttempt(
                   `estimatedPromptTokens=${preemptiveCompaction.estimatedPromptTokens} ` +
                   `promptBudgetBeforeReserve=${preemptiveCompaction.promptBudgetBeforeReserve} ` +
                   `overflowTokens=${preemptiveCompaction.overflowTokens} ` +
+                  `utilizationPressureTokens=${preemptiveCompaction.utilizationPressureTokens} ` +
                   `toolResultReducibleChars=${preemptiveCompaction.toolResultReducibleChars} ` +
                   `effectiveReserveTokens=${preemptiveCompaction.effectiveReserveTokens} ` +
+                  `utilizationThreshold=${preemptiveCompaction.utilizationThreshold} ` +
                   `sessionFile=${params.sessionFile}`,
               );
               skipPromptSubmission = true;
@@ -2271,9 +2275,11 @@ export async function runEmbeddedAttempt(
                 `estimatedPromptTokens=${preemptiveCompaction.estimatedPromptTokens} ` +
                 `promptBudgetBeforeReserve=${preemptiveCompaction.promptBudgetBeforeReserve} ` +
                 `overflowTokens=${preemptiveCompaction.overflowTokens} ` +
+                `utilizationPressureTokens=${preemptiveCompaction.utilizationPressureTokens} ` +
                 `toolResultReducibleChars=${preemptiveCompaction.toolResultReducibleChars} ` +
                 `reserveTokens=${reserveTokens} ` +
                 `effectiveReserveTokens=${preemptiveCompaction.effectiveReserveTokens} ` +
+                `utilizationThreshold=${preemptiveCompaction.utilizationThreshold} ` +
                 `sessionFile=${params.sessionFile}`,
             );
             skipPromptSubmission = true;

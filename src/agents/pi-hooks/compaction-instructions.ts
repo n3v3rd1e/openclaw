@@ -12,7 +12,8 @@
  */
 export const DEFAULT_COMPACTION_INSTRUCTIONS =
   "Write the summary body in the primary language used in the conversation.\n" +
-  "Focus on factual content: what was discussed, decisions made, and current state.\n" +
+  "Focus on durable state: decisions made, current tasks, files/branches touched, verification run, blockers, and explicit user preferences.\n" +
+  "Drop noise: queued-message envelopes, internal runtime events, repeated logs, huge tool outputs, transient progress chatter, and failed/obsolete attempts unless needed to explain current state.\n" +
   "Keep the required summary structure and section headers unchanged.\n" +
   "Do not translate or alter code, file paths, identifiers, or error messages.";
 

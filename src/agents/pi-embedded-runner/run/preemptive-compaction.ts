@@ -13,6 +13,7 @@ export const PREEMPTIVE_OVERFLOW_ERROR_TEXT =
 
 const ESTIMATED_CHARS_PER_TOKEN = 4;
 const TRUNCATION_ROUTE_BUFFER_TOKENS = 512;
+const DEFAULT_PREEMPTIVE_UTILIZATION_THRESHOLD = 0.75;
 
 export type { PreemptiveCompactionRoute } from "./preemptive-compaction.types.js";
 
@@ -45,14 +46,22 @@ export function shouldPreemptivelyCompactBeforePrompt(params: {
   contextTokenBudget: number;
   reserveTokens: number;
   toolResultMaxChars?: number;
+  /**
+   * Proactively compact before the prompt technically overflows. Some live CLI
+   * transports can still spend minutes replaying very large-but-under-budget
+   * transcripts and then fail on output/replay limits. Default: 75%.
+   */
+  utilizationThreshold?: number;
 }): {
   route: PreemptiveCompactionRoute;
   shouldCompact: boolean;
   estimatedPromptTokens: number;
   promptBudgetBeforeReserve: number;
   overflowTokens: number;
+  utilizationPressureTokens: number;
   toolResultReducibleChars: number;
   effectiveReserveTokens: number;
+  utilizationThreshold: number;
 } {
   const estimatedPromptTokens = estimatePrePromptTokens(params);
   const contextTokenBudget = Math.max(1, Math.floor(params.contextTokenBudget));
@@ -66,13 +75,21 @@ export function shouldPreemptivelyCompactBeforePrompt(params: {
     Math.max(0, contextTokenBudget - minPromptBudget),
   );
   const promptBudgetBeforeReserve = Math.max(1, contextTokenBudget - effectiveReserveTokens);
+  const rawUtilizationThreshold =
+    typeof params.utilizationThreshold === "number" && Number.isFinite(params.utilizationThreshold)
+      ? params.utilizationThreshold
+      : DEFAULT_PREEMPTIVE_UTILIZATION_THRESHOLD;
+  const utilizationThreshold = Math.min(0.95, Math.max(0.5, rawUtilizationThreshold));
+  const utilizationBudget = Math.max(1, Math.floor(contextTokenBudget * utilizationThreshold));
   const overflowTokens = Math.max(0, estimatedPromptTokens - promptBudgetBeforeReserve);
+  const utilizationPressureTokens = Math.max(0, estimatedPromptTokens - utilizationBudget);
+  const pressureTokens = Math.max(overflowTokens, utilizationPressureTokens);
   const toolResultPotential = estimateToolResultReductionPotential({
     messages: params.messages,
     contextWindowTokens: params.contextTokenBudget,
     maxCharsOverride: params.toolResultMaxChars,
   });
-  const overflowChars = overflowTokens * ESTIMATED_CHARS_PER_TOKEN;
+  const overflowChars = pressureTokens * ESTIMATED_CHARS_PER_TOKEN;
   const truncationBufferChars = TRUNCATION_ROUTE_BUFFER_TOKENS * ESTIMATED_CHARS_PER_TOKEN;
   const truncateOnlyThresholdChars = Math.max(
     overflowChars + truncationBufferChars,
@@ -81,7 +98,7 @@ export function shouldPreemptivelyCompactBeforePrompt(params: {
   const toolResultReducibleChars = toolResultPotential.maxReducibleChars;
 
   let route: PreemptiveCompactionRoute = "fits";
-  if (overflowTokens > 0) {
+  if (pressureTokens > 0) {
     if (toolResultReducibleChars <= 0) {
       route = "compact_only";
     } else if (toolResultReducibleChars >= truncateOnlyThresholdChars) {
@@ -96,7 +113,9 @@ export function shouldPreemptivelyCompactBeforePrompt(params: {
     estimatedPromptTokens,
     promptBudgetBeforeReserve,
     overflowTokens,
+    utilizationPressureTokens,
     toolResultReducibleChars,
     effectiveReserveTokens,
+    utilizationThreshold,
   };
 }

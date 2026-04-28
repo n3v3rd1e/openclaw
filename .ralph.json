@@ -200,11 +200,76 @@
           "action": "verified",
           "timestamp": "2026-04-28T16:48:43.136Z",
           "details": "\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.4 \u001b[39m\u001b[90m/Users/n3v3rd1e/ravenquill/software/openclaw\u001b[39m\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m extension-discord \u001b[49m\u001b[39m extensions/discord/src/monitor/message-handler.process.test.ts \u001b[2m(\u001b[22m\u001b[2m33 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 156\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m extension-discord \u001b[49m\u001b[39m extensions/discord/src/draft-stream.test.ts \u001b[2m(\u001b[22m\u001b[2m5 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m2 passed\u001b[39m\u001b[22m\u001b[90m (2)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m38 passed\u001b[39m\u001b[22m\u001b[90m (38)\u001b[39m\n\u001b[2m   Start at \u001b[22m 18:48:39\n\u001b[2m   Duration \u001b[22m 3.71s\u001b[2m (transform 1.65s, setup 55ms, import 3.39s, tests 158ms, environment 0ms)\u001b[22m\n\nOK"
+        },
+        {
+          "action": "started",
+          "timestamp": "2026-04-28T18:39:53.076Z"
+        },
+        {
+          "action": "verify-started",
+          "timestamp": "2026-04-28T18:40:11.929Z"
+        },
+        {
+          "action": "verified",
+          "timestamp": "2026-04-28T18:40:21.731Z",
+          "details": "\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.4 \u001b[39m\u001b[90m/Users/n3v3rd1e/ravenquill/software/openclaw\u001b[39m\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m extension-discord \u001b[49m\u001b[39m extensions/discord/src/monitor/message-handler.process.test.ts \u001b[2m(\u001b[22m\u001b[2m33 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 163\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m extension-discord \u001b[49m\u001b[39m extensions/discord/src/draft-stream.test.ts \u001b[2m(\u001b[22m\u001b[2m5 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m2 passed\u001b[39m\u001b[22m\u001b[90m (2)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m38 passed\u001b[39m\u001b[22m\u001b[90m (38)\u001b[39m\n\u001b[2m   Start at \u001b[22m 20:40:17\n\u001b[2m   Duration \u001b[22m 3.90s\u001b[2m (transform 1.65s, setup 68ms, import 3.56s, tests 165ms, environment 0ms)\u001b[22m\n\nOK"
         }
       ],
-      "startedAt": "2026-04-28T16:38:56.428Z",
-      "completedAt": "2026-04-28T16:48:43.136Z"
+      "startedAt": "2026-04-28T18:39:53.076Z",
+      "completedAt": "2026-04-28T18:40:21.731Z"
+    },
+    {
+      "id": 7,
+      "title": "Improve OpenClaw compaction for bloated sessions before tool-heavy turns",
+      "description": "",
+      "status": "done",
+      "verify": "pnpm vitest run src/agents/pi-hooks/compaction-instructions.test.ts src/agents/pi-embedded-runner/run/preemptive-compaction.test.ts",
+      "createdAt": "2026-04-28T18:39:53.024Z",
+      "history": [
+        {
+          "action": "created",
+          "timestamp": "2026-04-28T18:39:53.024Z"
+        },
+        {
+          "action": "started",
+          "timestamp": "2026-04-28T18:40:21.757Z"
+        },
+        {
+          "action": "updated",
+          "timestamp": "2026-04-28T18:44:47.288Z",
+          "details": "verify → \"pnpm vitest run src/agents/pi-embedded-runner/run/preemptive-compaction.test.ts\""
+        },
+        {
+          "action": "verify-started",
+          "timestamp": "2026-04-28T18:44:47.310Z"
+        },
+        {
+          "action": "verified",
+          "timestamp": "2026-04-28T18:45:23.349Z",
+          "details": "\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.4 \u001b[39m\u001b[90m/Users/n3v3rd1e/ravenquill/software/openclaw\u001b[39m\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[46m agents \u001b[49m\u001b[39m ../../src/agents/pi-embedded-runner/run/preemptive-compaction.test.ts \u001b[2m(\u001b[22m\u001b[2m11 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 71\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m11 passed\u001b[39m\u001b[22m\u001b[90m (11)\u001b[39m\n\u001b[2m   Start at \u001b[22m 20:45:22\n\u001b[2m   Duration \u001b[22m 1.17s\u001b[2m (transform 210ms, setup 111ms, import 839ms, tests 71ms, environment 0ms)\u001b[22m"
+        },
+        {
+          "action": "updated",
+          "timestamp": "2026-04-28T18:46:21.929Z",
+          "details": "verify → \"pnpm vitest run src/agents/pi-hooks/compaction-instructions.test.ts src/agents/pi-embedded-runner/run/preemptive-compaction.test.ts\""
+        },
+        {
+          "action": "verify-started",
+          "timestamp": "2026-04-28T18:46:21.958Z"
+        },
+        {
+          "action": "verify-started",
+          "timestamp": "2026-04-28T18:46:29.694Z"
+        },
+        {
+          "action": "verified",
+          "timestamp": "2026-04-28T18:47:03.854Z",
+          "details": "\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.4 \u001b[39m\u001b[90m/Users/n3v3rd1e/ravenquill/software/openclaw\u001b[39m\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[45m unit-fast \u001b[49m\u001b[39m ../../src/agents/pi-hooks/compaction-instructions.test.ts \u001b[2m(\u001b[22m\u001b[2m36 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 10\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[46m agents \u001b[49m\u001b[39m ../../src/agents/pi-embedded-runner/run/preemptive-compaction.test.ts \u001b[2m(\u001b[22m\u001b[2m11 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 47\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m2 passed\u001b[39m\u001b[22m\u001b[90m (2)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m47 passed\u001b[39m\u001b[22m\u001b[90m (47)\u001b[39m\n\u001b[2m   Start at \u001b[22m 20:47:03\n\u001b[2m   Duration \u001b[22m 640ms\u001b[2m (transform 90ms, setup 33ms, import 423ms, tests 57ms, environment 0ms)\u001b[22m"
+        }
+      ],
+      "startedAt": "2026-04-28T18:40:21.757Z",
+      "completedAt": "2026-04-28T18:47:03.854Z"
     }
   ],
-  "nextId": 7
+  "nextId": 8
 }
