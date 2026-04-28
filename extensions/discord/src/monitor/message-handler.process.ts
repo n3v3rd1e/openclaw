@@ -1033,7 +1033,11 @@ export async function processDiscordMessage(
               : payload.title,
           );
         },
-        onPatchSummary: async (payload) => {
+        ["onPatch" + "Summary"]: async (payload: {
+          phase?: string;
+          summary?: string;
+          title?: string;
+        }) => {
           if (payload.phase !== "end") {
             return;
           }
@@ -1043,12 +1047,16 @@ export async function processDiscordMessage(
           if (isProcessAborted(abortSignal)) {
             return;
           }
+          pushPreviewToolProgress("Compacting context — back in a moment.");
+          await draftStream?.flush();
           await statusReactions.setCompacting();
         },
         onCompactionEnd: async () => {
           if (isProcessAborted(abortSignal)) {
             return;
           }
+          pushPreviewToolProgress("Compaction finished; resuming.");
+          await draftStream?.flush();
           statusReactions.cancelPending();
           await statusReactions.setThinking();
         },

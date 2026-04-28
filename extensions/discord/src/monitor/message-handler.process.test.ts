@@ -947,6 +947,43 @@ describe("processDiscordMessage draft streaming", () => {
     expect(draftStream.update).toHaveBeenCalledWith("Hello world");
   });
 
+  it("edits the initial draft ack with live tool progress", async () => {
+    const draftStream = createMockDraftStreamForTest();
+
+    dispatchInboundMessage.mockImplementationOnce(async (params?: DispatchInboundParams) => {
+      await params?.replyOptions?.onToolStart?.({ name: "read" });
+      return createNoQueuedDispatchResult();
+    });
+
+    await runInPartialStreamMode();
+
+    expect(draftStream.update.mock.calls.map((call) => call[0])).toEqual([
+      "Working…",
+      "Working…\n• tool: read",
+    ]);
+    expect(
+      dispatchInboundMessage.mock.calls[0]?.[0]?.replyOptions?.suppressDefaultToolProgressMessages,
+    ).toBe(true);
+  });
+
+  it("edits the draft ack during compaction and resumes afterwards", async () => {
+    const draftStream = createMockDraftStreamForTest();
+
+    dispatchInboundMessage.mockImplementationOnce(async (params?: DispatchInboundParams) => {
+      await params?.replyOptions?.onCompactionStart?.();
+      await params?.replyOptions?.onCompactionEnd?.();
+      return createNoQueuedDispatchResult();
+    });
+
+    await runInPartialStreamMode();
+
+    expect(draftStream.update.mock.calls.map((call) => call[0])).toEqual([
+      "Working…",
+      "Working…\n• Compacting context — back in a moment.",
+      "Working…\n• Compacting context — back in a moment.\n• Compaction finished; resuming.",
+    ]);
+  });
+
   it("forces new preview messages on assistant boundaries in block mode", async () => {
     const draftStream = createMockDraftStreamForTest();
 
