@@ -86,6 +86,7 @@ import {
   fetchDiscordBotIdentity,
   registerDiscordMonitorListeners,
 } from "./provider.startup.js";
+import { startDiscordRestBackfill, type DiscordRestBackfillHandle } from "./rest-backfill.js";
 import { resolveDiscordRestFetch } from "./rest-fetch.js";
 import { formatDiscordStartupStatusMessage } from "./startup-status.js";
 import type { DiscordMonitorStatusSink } from "./status.js";
@@ -810,6 +811,7 @@ export async function monitorDiscordProvider(opts: MonitorDiscordOpts = {}) {
     typeof createDiscordMonitorClient
   >["autoPresenceController"] = null;
   let lifecycleGateway: MutableDiscordGateway | undefined;
+  let restBackfill: DiscordRestBackfillHandle | null = null;
   let earlyGatewayEmitter = gatewaySupervisor?.emitter;
   let onEarlyGatewayDebug: ((msg: unknown) => void) | undefined;
   try {
@@ -1090,6 +1092,18 @@ export async function monitorDiscordProvider(opts: MonitorDiscordOpts = {}) {
       trackInboundEvent,
       eventQueueListenerTimeoutMs: eventQueueOpts.listenerTimeout,
     });
+    restBackfill = startDiscordRestBackfill({
+      accountId: account.accountId,
+      client,
+      runtime,
+      discordConfig: discordCfg,
+      guildEntries,
+      groupDmChannels,
+      botUserId,
+      messageHandler,
+      trackInboundEvent,
+      abortSignal: opts.abortSignal,
+    });
 
     logDiscordStartupPhase({
       runtime,
@@ -1127,6 +1141,7 @@ export async function monitorDiscordProvider(opts: MonitorDiscordOpts = {}) {
       gatewaySupervisor,
     });
   } finally {
+    restBackfill?.stop();
     deactivateMessageHandler?.();
     autoPresenceController?.stop();
     opts.setStatus?.({ connected: false });

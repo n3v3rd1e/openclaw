@@ -1,0 +1,90 @@
+{
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Fix Discord inbound/reactions + outbound delivery reliability",
+      "description": "",
+      "status": "in-progress",
+      "verify": "pnpm tsgo:test:extensions && node scripts/test-projects.mjs extensions/discord/src/monitor/provider.lifecycle.test.ts",
+      "createdAt": "2026-04-26T07:49:28.960Z",
+      "history": [
+        {
+          "action": "created",
+          "timestamp": "2026-04-26T07:49:28.961Z"
+        },
+        {
+          "action": "started",
+          "timestamp": "2026-04-26T07:49:40.655Z"
+        },
+        {
+          "action": "updated",
+          "timestamp": "2026-04-26T07:54:47.823Z",
+          "details": "verify → \"pnpm tsgo:test:extensions && node scripts/test-projects.mjs extensions/discord/src/monitor/provider.lifecycle.test.ts && pnpm build\""
+        },
+        {
+          "action": "verify-started",
+          "timestamp": "2026-04-26T07:56:57.430Z"
+        },
+        {
+          "action": "verify-failed",
+          "timestamp": "2026-04-26T07:57:27.447Z",
+          "details": "[test] starting test/vitest/vitest.extension-discord.config.ts\n[build-all] canvas:a2ui:bundle\n[build-all] tsdown"
+        },
+        {
+          "action": "updated",
+          "timestamp": "2026-04-26T07:57:39.632Z",
+          "details": "verify → \"pnpm tsgo:test:extensions && node scripts/test-projects.mjs extensions/discord/src/monitor/provider.lifecycle.test.ts\""
+        },
+        {
+          "action": "verify-started",
+          "timestamp": "2026-04-26T07:57:39.661Z"
+        },
+        {
+          "action": "verified",
+          "timestamp": "2026-04-26T07:57:47.719Z",
+          "details": "> openclaw@2026.4.23 tsgo:test:extensions /Users/n3v3rd1e/ravenquill/software/openclaw\n> pnpm tsgo:extensions:test\n\n\n> openclaw@2026.4.23 tsgo:extensions:test /Users/n3v3rd1e/ravenquill/software/openclaw\n> node scripts/run-tsgo.mjs -p tsconfig.extensions.test.json --incremental --tsBuildInfoFile .artifacts/tsgo-cache/extensions-test.tsbuildinfo\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.4 \u001b[39m\u001b[90m/Users/n3v3rd1e/ravenquill/software/openclaw\u001b[39m\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m extension-discord \u001b[49m\u001b[39m extensions/discord/src/monitor/provider.lifecycle.test.ts \u001b[2m(\u001b[22m\u001b[2m16 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 529\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m16 passed\u001b[39m\u001b[22m\u001b[90m (16)\u001b[39m\n\u001b[2m   Start at \u001b[22m 09:57:47\n\u001b[2m   Duration \u001b[22m 667ms\u001b[2m (transform 186ms, setup 47ms, import 4ms, tests 529ms, environment 0ms)\u001b[22m"
+        },
+        {
+          "action": "started",
+          "timestamp": "2026-04-27T08:50:39.066Z"
+        }
+      ],
+      "startedAt": "2026-04-27T08:50:39.066Z",
+      "completedAt": "2026-04-26T07:57:47.719Z"
+    },
+    {
+      "id": 2,
+      "title": "Fix phantom/stale Discord outbound messages permanently",
+      "description": "",
+      "status": "in-progress",
+      "verify": "",
+      "createdAt": "2026-04-27T08:50:39.040Z",
+      "history": [
+        {
+          "action": "created",
+          "timestamp": "2026-04-27T08:50:39.040Z"
+        },
+        {
+          "action": "started",
+          "timestamp": "2026-04-27T08:51:02.125Z"
+        }
+      ],
+      "startedAt": "2026-04-27T08:51:02.125Z"
+    },
+    {
+      "id": 3,
+      "title": "Discord REST backfill for missed gateway messages",
+      "description": "",
+      "status": "todo",
+      "verify": "pnpm --filter @openclaw/extension-discord test",
+      "createdAt": "2026-04-28T10:26:59.529Z",
+      "history": [
+        {
+          "action": "created",
+          "timestamp": "2026-04-28T10:26:59.530Z"
+        }
+      ]
+    }
+  ],
+  "nextId": 4
+}

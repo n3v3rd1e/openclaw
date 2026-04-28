@@ -537,4 +537,79 @@ describe("runDiscordGatewayLifecycle", () => {
       vi.useRealTimers();
     }
   });
+
+  it("force-stops when Carbon schedules reconnects but never reaches a new socket", async () => {
+    vi.useFakeTimers();
+    try {
+      const { emitter, gateway } = createGatewayHarness();
+      gateway.isConnected = true;
+      getDiscordGatewayEmitterMock.mockReturnValueOnce(emitter);
+      waitForDiscordGatewayStopMock.mockImplementationOnce(
+        (params: WaitForDiscordGatewayStopParams) =>
+          new Promise<void>((_resolve, reject) => {
+            params.registerForceStop?.((err) => reject(err));
+            gateway.isConnected = false;
+            emitter.emit("debug", "Gateway websocket closed: 1006");
+            emitter.emit("debug", "Gateway reconnect scheduled in 1000ms (close, resume=true)");
+          }),
+      );
+
+      const { lifecycleParams, runtimeError, statusSink } = createLifecycleHarness({ gateway });
+      const lifecyclePromise = runDiscordGatewayLifecycle(lifecycleParams);
+      lifecyclePromise.catch(() => {});
+
+      // Watch budget = scheduled delay (1000ms) + runtime-ready window (30000ms).
+      await vi.advanceTimersByTimeAsync(31_500);
+      await expect(lifecyclePromise).rejects.toThrow(
+        "discord gateway did not reconnect within 31000ms after reconnect schedule",
+      );
+      expect(runtimeError).toHaveBeenCalledWith(
+        expect.stringContaining("did not reconnect within 31000ms after reconnect schedule"),
+      );
+      expect(statusSink).toHaveBeenCalledWith(
+        expect.objectContaining({
+          connected: false,
+          lastDisconnect: expect.objectContaining({ error: "runtime-reconnect-timeout" }),
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not force-stop while Carbon is still backing off within the scheduled delay", async () => {
+    vi.useFakeTimers();
+    try {
+      const { emitter, gateway } = createGatewayHarness();
+      gateway.isConnected = true;
+      getDiscordGatewayEmitterMock.mockReturnValueOnce(emitter);
+      waitForDiscordGatewayStopMock.mockImplementationOnce(
+        (params: WaitForDiscordGatewayStopParams) =>
+          new Promise<void>((resolve, reject) => {
+            params.registerForceStop?.((err) => reject(err));
+            gateway.isConnected = false;
+            emitter.emit("debug", "Gateway websocket closed: 1006");
+            // Carbon's exponential backoff caps at maxDelay (30000ms) + jitter,
+            // so the budget must include the scheduled delay before triggering.
+            emitter.emit("debug", "Gateway reconnect scheduled in 30000ms (close, resume=true)");
+            setTimeout(() => {
+              gateway.isConnected = true;
+              emitter.emit("debug", "Gateway websocket opened");
+              resolve();
+            }, 31_000);
+          }),
+      );
+
+      const { lifecycleParams, runtimeError } = createLifecycleHarness({ gateway });
+      const lifecyclePromise = runDiscordGatewayLifecycle(lifecycleParams);
+
+      await vi.advanceTimersByTimeAsync(31_500);
+      await expect(lifecyclePromise).resolves.toBeUndefined();
+      expect(runtimeError).not.toHaveBeenCalledWith(
+        expect.stringContaining("did not reconnect within"),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

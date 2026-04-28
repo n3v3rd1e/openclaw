@@ -140,6 +140,15 @@ function parseGatewayCloseCode(message: string): number | undefined {
   return Number.isFinite(code) ? code : undefined;
 }
 
+function parseGatewayReconnectDelayMs(message: string): number | undefined {
+  const match = /Gateway reconnect scheduled in\s+(\d+)ms/.exec(message);
+  if (!match?.[1]) {
+    return undefined;
+  }
+  const delay = Number.parseInt(match[1], 10);
+  return Number.isFinite(delay) && delay >= 0 ? delay : undefined;
+}
+
 function createGatewayStatusObserver(params: {
   gateway?: Pick<MutableDiscordGateway, "isConnected">;
   abortSignal?: AbortSignal;
@@ -151,6 +160,7 @@ function createGatewayStatusObserver(params: {
   let queuedForceStopError: unknown;
   let readyPollId: ReturnType<typeof setInterval> | undefined;
   let readyTimeoutId: ReturnType<typeof setTimeout> | undefined;
+  let reconnectTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const shouldStop = () => params.abortSignal?.aborted || params.isLifecycleStopping();
   const clearReadyWatch = () => {
@@ -163,6 +173,12 @@ function createGatewayStatusObserver(params: {
       readyTimeoutId = undefined;
     }
   };
+  const clearReconnectWatch = () => {
+    if (reconnectTimeoutId) {
+      clearTimeout(reconnectTimeoutId);
+      reconnectTimeoutId = undefined;
+    }
+  };
   const triggerForceStop = (err: unknown) => {
     if (forceStopHandler) {
       forceStopHandler(err);
@@ -171,11 +187,42 @@ function createGatewayStatusObserver(params: {
     queuedForceStopError = err;
   };
   const pushConnectedStatus = (at: number) => {
+    clearReconnectWatch();
     params.pushStatus({
       ...createConnectedChannelStatusPatch(at),
       lastDisconnect: null,
       lastError: null,
     });
+  };
+  const startReconnectWatch = (reason: string, scheduledDelayMs: number) => {
+    clearReconnectWatch();
+    // Carbon's reconnect uses exponential backoff up to maxDelay (30s) with
+    // jitter, plus actual websocket open + RESUME RTT. Budget the scheduled
+    // delay plus the runtime-ready window so normal backoff doesn't trip the
+    // safety net.
+    const timeoutMs = scheduledDelayMs + DISCORD_GATEWAY_RUNTIME_READY_TIMEOUT_MS;
+    reconnectTimeoutId = setTimeout(() => {
+      reconnectTimeoutId = undefined;
+      if (shouldStop() || params.gateway?.isConnected) {
+        return;
+      }
+      const at = Date.now();
+      const error = new Error(
+        `discord gateway did not reconnect within ${timeoutMs}ms after ${reason}`,
+      );
+      params.pushStatus({
+        connected: false,
+        lastEventAt: at,
+        lastDisconnect: {
+          at,
+          error: "runtime-reconnect-timeout",
+        },
+        lastError: "runtime-reconnect-timeout",
+      });
+      params.runtime.error?.(danger(error.message));
+      triggerForceStop(error);
+    }, timeoutMs);
+    reconnectTimeoutId.unref?.();
   };
   const startReadyWatch = () => {
     clearReadyWatch();
@@ -227,16 +274,22 @@ function createGatewayStatusObserver(params: {
     const at = Date.now();
     const message = String(msg);
     if (message.includes("Gateway websocket opened")) {
-      params.pushStatus({ connected: false, lastEventAt: at });
+      clearReconnectWatch();
+      params.pushStatus({ connected: false, lastEventAt: at, lastTransportActivityAt: at });
       startReadyWatch();
       return;
     }
     if (message.includes("Gateway websocket closed")) {
       clearReadyWatch();
+      // Carbon emits "Gateway reconnect scheduled in {delay}ms" right after
+      // close in the normal path; fatal close codes emit "error" instead.
+      // Either way the reschedule branch (or the gateway supervisor) owns the
+      // watchdog, so don't start an open-ended watch here.
       const code = parseGatewayCloseCode(message);
       params.pushStatus({
         connected: false,
         lastEventAt: at,
+        lastTransportActivityAt: at,
         lastDisconnect: {
           at,
           ...(code !== undefined ? { status: code } : {}),
@@ -249,8 +302,11 @@ function createGatewayStatusObserver(params: {
       params.pushStatus({
         connected: false,
         lastEventAt: at,
+        lastTransportActivityAt: at,
         lastError: message,
       });
+      const scheduledDelayMs = parseGatewayReconnectDelayMs(message) ?? 0;
+      startReconnectWatch("reconnect schedule", scheduledDelayMs);
     }
   };
 
@@ -267,6 +323,7 @@ function createGatewayStatusObserver(params: {
     },
     dispose: () => {
       clearReadyWatch();
+      clearReconnectWatch();
       forceStopHandler = undefined;
       queuedForceStopError = undefined;
     },
