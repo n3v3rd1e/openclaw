@@ -4,7 +4,7 @@
       "id": 1,
       "title": "Fix Discord inbound/reactions + outbound delivery reliability",
       "description": "",
-      "status": "in-progress",
+      "status": "done",
       "verify": "pnpm tsgo:test:extensions && node scripts/test-projects.mjs extensions/discord/src/monitor/provider.lifecycle.test.ts",
       "createdAt": "2026-04-26T07:49:28.960Z",
       "history": [
@@ -47,10 +47,15 @@
         {
           "action": "started",
           "timestamp": "2026-04-27T08:50:39.066Z"
+        },
+        {
+          "action": "updated",
+          "timestamp": "2026-04-28T16:55:15.019Z",
+          "details": "status → done"
         }
       ],
       "startedAt": "2026-04-27T08:50:39.066Z",
-      "completedAt": "2026-04-26T07:57:47.719Z"
+      "completedAt": "2026-04-28T16:55:15.019Z"
     },
     {
       "id": 2,
