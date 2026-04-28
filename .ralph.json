@@ -84,7 +84,21 @@
           "timestamp": "2026-04-28T10:26:59.530Z"
         }
       ]
+    },
+    {
+      "id": 4,
+      "title": "Restore Discord immediate ack/progress message edits",
+      "description": "",
+      "status": "todo",
+      "verify": "node scripts/test-projects.mjs extensions/discord/src/monitor/message-handler.process.test.ts extensions/discord/src/draft-stream.test.ts && pnpm exec tsc --noEmit --pretty false --project extensions/discord/tsconfig.json",
+      "createdAt": "2026-04-28T12:42:46.563Z",
+      "history": [
+        {
+          "action": "created",
+          "timestamp": "2026-04-28T12:42:46.563Z"
+        }
+      ]
     }
   ],
-  "nextId": 4
+  "nextId": 5
 }

@@ -614,7 +614,7 @@ export async function processDiscordMessage(
         channelId: deliverChannelId,
         maxChars: draftMaxChars,
         replyToMessageId: draftReplyToMessageId,
-        minInitialChars: 30,
+        minInitialChars: 1,
         throttleMs: 1200,
         log: logVerbose,
         warn: logVerbose,
@@ -635,6 +635,17 @@ export async function processDiscordMessage(
     Boolean(draftStream) && resolveChannelStreamingPreviewToolProgress(discordConfig);
   let previewToolProgressSuppressed = false;
   let previewToolProgressLines: string[] = [];
+
+  const sendInitialDraftAck = async () => {
+    if (!draftStream) {
+      return;
+    }
+    const ackText = "Working…";
+    lastPartialText = ackText;
+    draftText = ackText;
+    draftStream.update(ackText);
+    await draftStream.flush();
+  };
 
   const pushPreviewToolProgress = (line?: string) => {
     if (!draftStream || !previewToolProgressEnabled || previewToolProgressSuppressed) {
@@ -940,6 +951,7 @@ export async function processDiscordMessage(
       dispatchAborted = true;
       return;
     }
+    await sendInitialDraftAck();
     dispatchResult = await dispatchInboundMessage({
       ctx: ctxPayload,
       cfg,

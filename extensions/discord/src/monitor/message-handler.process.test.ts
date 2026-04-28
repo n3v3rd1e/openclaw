@@ -750,6 +750,16 @@ describe("processDiscordMessage draft streaming", () => {
     });
   }
 
+  it("sends an immediate draft ack before dispatch work starts", async () => {
+    const draftStream = createMockDraftStreamForTest();
+
+    await runSingleChunkFinalScenario({ streamMode: "partial", maxLinesPerMessage: 5 });
+
+    expect(draftStream.update).toHaveBeenNthCalledWith(1, "Working…");
+    expect(draftStream.flush).toHaveBeenCalledBefore(dispatchInboundMessage);
+    expectSinglePreviewEdit();
+  });
+
   it("finalizes via preview edit when final fits one chunk", async () => {
     await runSingleChunkFinalScenario({ streamMode: "partial", maxLinesPerMessage: 5 });
     expectSinglePreviewEdit();
@@ -841,7 +851,7 @@ describe("processDiscordMessage draft streaming", () => {
 
     await processDiscordMessage(ctx as any);
 
-    expect(draftStream.flush).not.toHaveBeenCalled();
+    expect(draftStream.flush).toHaveBeenCalledTimes(1);
     expect(draftStream.discardPending).toHaveBeenCalledTimes(1);
     expect(draftStream.clear).toHaveBeenCalledTimes(1);
     expect(editMessageDiscord).not.toHaveBeenCalled();
@@ -864,7 +874,7 @@ describe("processDiscordMessage draft streaming", () => {
 
     await processDiscordMessage(ctx as any);
 
-    expect(draftStream.flush).not.toHaveBeenCalled();
+    expect(draftStream.flush).toHaveBeenCalledTimes(1);
     expect(draftStream.discardPending).toHaveBeenCalledTimes(1);
     expect(draftStream.clear).toHaveBeenCalledTimes(1);
     expect(editMessageDiscord).not.toHaveBeenCalled();
@@ -915,7 +925,7 @@ describe("processDiscordMessage draft streaming", () => {
     await processDiscordMessage(ctx as any);
 
     const updates = draftStream.update.mock.calls.map((call) => call[0]);
-    expect(updates).toEqual(["Hello", "HelloWorld"]);
+    expect(updates).toEqual(["Working…", "Hello", "HelloWorld"]);
   });
 
   it("strips reply tags from preview partials", async () => {
@@ -983,6 +993,6 @@ describe("processDiscordMessage draft streaming", () => {
 
     await runInPartialStreamMode();
 
-    expect(draftStream.update).not.toHaveBeenCalled();
+    expect(draftStream.update.mock.calls.map((call) => call[0])).toEqual(["Working…"]);
   });
 });
