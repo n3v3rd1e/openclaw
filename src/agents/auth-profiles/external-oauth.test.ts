@@ -17,6 +17,7 @@ const readCodexCliCredentialsCachedMock = vi.hoisted(() =>
 vi.mock("../cli-credentials.js", () => ({
   readCodexCliCredentialsCached: readCodexCliCredentialsCachedMock,
   readMiniMaxCliCredentialsCached: () => null,
+  readClaudeCliCredentialsCached: () => null,
 }));
 
 function createStore(profiles: AuthProfileStore["profiles"] = {}): AuthProfileStore {

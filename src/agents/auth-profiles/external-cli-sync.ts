@@ -1,5 +1,12 @@
-import { readMiniMaxCliCredentialsCached } from "../cli-credentials.js";
-import { EXTERNAL_CLI_SYNC_TTL_MS, MINIMAX_CLI_PROFILE_ID } from "./constants.js";
+import {
+  readClaudeCliCredentialsCached,
+  readMiniMaxCliCredentialsCached,
+} from "../cli-credentials.js";
+import {
+  CLAUDE_CLI_PROFILE_ID,
+  EXTERNAL_CLI_SYNC_TTL_MS,
+  MINIMAX_CLI_PROFILE_ID,
+} from "./constants.js";
 import { log } from "./constants.js";
 import {
   areOAuthCredentialsEquivalent,
@@ -71,11 +78,30 @@ export function isSafeToUseExternalCliCredential(
   return true;
 }
 
+function readClaudeCliExternalCredential(): OAuthCredential | null {
+  const cred = readClaudeCliCredentialsCached({ ttlMs: EXTERNAL_CLI_SYNC_TTL_MS });
+  if (!cred || cred.type !== "oauth") {
+    return null;
+  }
+  return {
+    type: "oauth",
+    provider: "claude-cli",
+    access: cred.access,
+    refresh: cred.refresh,
+    expires: cred.expires,
+  };
+}
+
 const EXTERNAL_CLI_SYNC_PROVIDERS: ExternalCliSyncProvider[] = [
   {
     profileId: MINIMAX_CLI_PROFILE_ID,
     provider: "minimax-portal",
     readCredentials: () => readMiniMaxCliCredentialsCached({ ttlMs: EXTERNAL_CLI_SYNC_TTL_MS }),
+  },
+  {
+    profileId: CLAUDE_CLI_PROFILE_ID,
+    provider: "claude-cli",
+    readCredentials: readClaudeCliExternalCredential,
   },
 ];
 

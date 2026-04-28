@@ -4,6 +4,9 @@ import type { AuthProfileStore, OAuthCredential } from "./auth-profiles/types.js
 const mocks = vi.hoisted(() => ({
   readCodexCliCredentialsCached: vi.fn<() => OAuthCredential | null>(() => null),
   readMiniMaxCliCredentialsCached: vi.fn<() => OAuthCredential | null>(() => null),
+  readClaudeCliCredentialsCached: vi.fn<
+    () => { type: "oauth"; provider: string; access: string; refresh: string; expires: number } | null
+  >(() => null),
 }));
 
 let readManagedExternalCliCredential: typeof import("./auth-profiles/external-cli-sync.js").readManagedExternalCliCredential;
@@ -14,6 +17,7 @@ let shouldBootstrapFromExternalCliCredential: typeof import("./auth-profiles/ext
 let shouldReplaceStoredOAuthCredential: typeof import("./auth-profiles/external-cli-sync.js").shouldReplaceStoredOAuthCredential;
 let OPENAI_CODEX_DEFAULT_PROFILE_ID: typeof import("./auth-profiles/constants.js").OPENAI_CODEX_DEFAULT_PROFILE_ID;
 let MINIMAX_CLI_PROFILE_ID: typeof import("./auth-profiles/constants.js").MINIMAX_CLI_PROFILE_ID;
+let CLAUDE_CLI_PROFILE_ID: typeof import("./auth-profiles/constants.js").CLAUDE_CLI_PROFILE_ID;
 
 function makeOAuthCredential(
   overrides: Partial<OAuthCredential> & Pick<OAuthCredential, "provider">,
@@ -44,9 +48,11 @@ describe("external cli oauth resolution", () => {
     vi.doMock("./cli-credentials.js", () => ({
       readCodexCliCredentialsCached: mocks.readCodexCliCredentialsCached,
       readMiniMaxCliCredentialsCached: mocks.readMiniMaxCliCredentialsCached,
+      readClaudeCliCredentialsCached: mocks.readClaudeCliCredentialsCached,
     }));
     mocks.readCodexCliCredentialsCached.mockReset().mockReturnValue(null);
     mocks.readMiniMaxCliCredentialsCached.mockReset().mockReturnValue(null);
+    mocks.readClaudeCliCredentialsCached.mockReset().mockReturnValue(null);
     ({
       hasUsableOAuthCredential,
       isSafeToUseExternalCliCredential,
@@ -55,7 +61,7 @@ describe("external cli oauth resolution", () => {
       shouldBootstrapFromExternalCliCredential,
       shouldReplaceStoredOAuthCredential,
     } = await import("./auth-profiles/external-cli-sync.js"));
-    ({ OPENAI_CODEX_DEFAULT_PROFILE_ID, MINIMAX_CLI_PROFILE_ID } =
+    ({ OPENAI_CODEX_DEFAULT_PROFILE_ID, MINIMAX_CLI_PROFILE_ID, CLAUDE_CLI_PROFILE_ID } =
       await import("./auth-profiles/constants.js"));
   });
 
@@ -300,6 +306,62 @@ describe("external cli oauth resolution", () => {
           access: "fresh-store-access",
           refresh: "fresh-store-refresh",
           expires: Date.now() + 5 * 24 * 60 * 60_000,
+        }),
+      ),
+    );
+
+    expect(profiles).toEqual([]);
+  });
+
+  it("resolves fresher claude-cli external oauth from the keychain into a runtime overlay", () => {
+    const fresh = {
+      type: "oauth" as const,
+      provider: "anthropic",
+      access: "claude-cli-fresh-access",
+      refresh: "claude-cli-fresh-refresh",
+      expires: Date.now() + 5 * 24 * 60 * 60_000,
+    };
+    mocks.readClaudeCliCredentialsCached.mockReturnValue(fresh);
+
+    const profiles = resolveExternalCliAuthProfiles(
+      makeStore(
+        CLAUDE_CLI_PROFILE_ID,
+        makeOAuthCredential({
+          provider: "claude-cli",
+          access: "claude-cli-stale-access",
+          refresh: "claude-cli-stale-refresh",
+          expires: Date.now() - 60_000,
+        }),
+      ),
+    );
+
+    const profilesById = new Map(
+      profiles.map((profile) => [profile.profileId, profile.credential]),
+    );
+    expect(profilesById.get(CLAUDE_CLI_PROFILE_ID)).toMatchObject({
+      provider: "claude-cli",
+      access: "claude-cli-fresh-access",
+      refresh: "claude-cli-fresh-refresh",
+    });
+  });
+
+  it("does not overlay claude-cli when the stored oauth is still usable", () => {
+    mocks.readClaudeCliCredentialsCached.mockReturnValue({
+      type: "oauth",
+      provider: "anthropic",
+      access: "claude-cli-fresh-access",
+      refresh: "claude-cli-fresh-refresh",
+      expires: Date.now() + 5 * 24 * 60 * 60_000,
+    });
+
+    const profiles = resolveExternalCliAuthProfiles(
+      makeStore(
+        CLAUDE_CLI_PROFILE_ID,
+        makeOAuthCredential({
+          provider: "claude-cli",
+          access: "claude-cli-healthy-access",
+          refresh: "claude-cli-healthy-refresh",
+          expires: Date.now() + 10 * 60_000,
         }),
       ),
     );
