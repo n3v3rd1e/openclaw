@@ -71,7 +71,6 @@ async function deliverRestartSentinelNotice(params: {
   cfg: ReturnType<typeof loadSessionEntry>["cfg"];
   sessionKey: string;
   summary: string;
-  message: string;
   channel: string;
   to: string;
   accountId?: string;
@@ -79,7 +78,7 @@ async function deliverRestartSentinelNotice(params: {
   threadId?: string;
   session: ReturnType<typeof buildOutboundSessionContext>;
 }) {
-  const payloads = [{ text: params.message }];
+  const payloads = [{ text: params.summary }];
   // Persist one recoverable notice across the whole retry loop so a transient
   // failure does not leave behind a stale duplicate queue entry.
   const queueId = await enqueueDelivery({
@@ -403,7 +402,6 @@ async function loadRestartSentinelStartupTask(params: {
           cfg,
           sessionKey: canonicalKey,
           summary,
-          message,
           channel,
           to: resolvedTo,
           accountId: origin?.accountId,

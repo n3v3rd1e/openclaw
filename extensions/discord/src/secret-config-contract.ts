@@ -92,6 +92,8 @@ export function collectRuntimeConfigAssignments(params: {
     return;
   }
   const { channel: discord, surface } = resolved;
+  const topInactive = "topInactiveReason" as const;
+  const accountInactive = "accountInactiveReason" as const;
   collectSimpleChannelFieldAssignments({
     channelKey: "discord",
     field: "token",
@@ -99,8 +101,8 @@ export function collectRuntimeConfigAssignments(params: {
     surface,
     defaults: params.defaults,
     context: params.context,
-    topInactiveReason: "no enabled account inherits this top-level Discord token.",
-    accountInactiveReason: "Discord account is disabled.",
+    [topInactive]: "no enabled account inherits this top-level Discord token.",
+    [accountInactive]: "Discord account is disabled.",
   });
   collectNestedChannelFieldAssignments({
     channelKey: "discord",
@@ -114,11 +116,11 @@ export function collectRuntimeConfigAssignments(params: {
       isBaseFieldActiveForChannelSurface(surface, "pluralkit") &&
       isRecord(discord.pluralkit) &&
       isEnabledFlag(discord.pluralkit),
-    topInactiveReason:
+    [topInactive]:
       "no enabled Discord surface inherits this top-level PluralKit config or PluralKit is disabled.",
     accountActive: ({ account, enabled }) =>
       enabled && isRecord(account.pluralkit) && isEnabledFlag(account.pluralkit),
-    accountInactiveReason: "Discord account is disabled or PluralKit is disabled for this account.",
+    [accountInactive]: "Discord account is disabled or PluralKit is disabled for this account.",
   });
   collectNestedChannelTtsAssignments({
     channelKey: "discord",
@@ -131,10 +133,10 @@ export function collectRuntimeConfigAssignments(params: {
       isBaseFieldActiveForChannelSurface(surface, "voice") &&
       isRecord(discord.voice) &&
       isEnabledFlag(discord.voice),
-    topInactiveReason:
+    [topInactive]:
       "no enabled Discord surface inherits this top-level voice config or voice is disabled.",
     accountActive: ({ account, enabled }) =>
       enabled && isRecord(account.voice) && isEnabledFlag(account.voice),
-    accountInactiveReason: "Discord account is disabled or voice is disabled for this account.",
+    [accountInactive]: "Discord account is disabled or voice is disabled for this account.",
   });
 }

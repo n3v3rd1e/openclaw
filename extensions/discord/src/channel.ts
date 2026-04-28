@@ -161,6 +161,8 @@ async function resolveDiscordSend(deps?: { [channelId: string]: unknown }): Prom
   );
 }
 
+const BUILD_CHANNEL_SUMMARY = "buildChannelSummary" as const;
+
 const discordMessageActions = {
   describeMessageTool: (
     ctx: Parameters<NonNullable<ChannelMessageActionAdapter["describeMessageTool"]>>[0],
@@ -565,7 +567,7 @@ export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount, DiscordProbe> 
           lastEventAt: null,
         }),
         collectStatusIssues: collectDiscordStatusIssues,
-        buildChannelSummary: ({ snapshot }) =>
+        [BUILD_CHANNEL_SUMMARY]: ({ snapshot }) =>
           buildTokenChannelStatusSummary(snapshot, { includeMode: false }),
         probeAccount: async ({ account, timeoutMs }) =>
           (await loadDiscordProbeRuntime()).probeDiscord(account.token, timeoutMs, {
