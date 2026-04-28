@@ -596,12 +596,14 @@ export async function processDiscordMessage(
   const chunkMode = resolveChunkMode(cfg, "discord", accountId);
 
   // --- Discord draft stream (edit-based preview streaming) ---
+  // Draft streaming and block streaming are not mutually exclusive: when draft
+  // streaming is active, block streaming is disabled downstream via
+  // `disableBlockStreamingForDraft`, and the draft uses its own block-aware
+  // chunker (`EmbeddedBlockChunker`) when stream mode is "block". Gate only on
+  // the channel/account stream mode.
   const discordStreamMode = resolveDiscordPreviewStreamMode(discordConfig);
   const draftMaxChars = Math.min(textLimit, 2000);
-  const accountBlockStreamingEnabled =
-    resolveChannelStreamingBlockEnabled(discordConfig) ??
-    cfg.agents?.defaults?.blockStreamingDefault === "on";
-  const canStreamDraft = discordStreamMode !== "off" && !accountBlockStreamingEnabled;
+  const canStreamDraft = discordStreamMode !== "off";
   const draftReplyToMessageId = () => replyReference.peek();
   const deliverChannelId = deliverTarget.startsWith("channel:")
     ? deliverTarget.slice("channel:".length)
