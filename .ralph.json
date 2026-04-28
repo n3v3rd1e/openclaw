@@ -98,7 +98,69 @@
           "timestamp": "2026-04-28T12:42:46.563Z"
         }
       ]
+    },
+    {
+      "id": 5,
+      "title": "Discord draft streaming: remove preview trailer text and verify granular message edits",
+      "description": "",
+      "status": "in-progress",
+      "verify": "",
+      "createdAt": "2026-04-28T15:33:45.027Z",
+      "history": [
+        {
+          "action": "created",
+          "timestamp": "2026-04-28T15:33:45.027Z"
+        },
+        {
+          "action": "started",
+          "timestamp": "2026-04-28T15:33:51.184Z"
+        }
+      ],
+      "startedAt": "2026-04-28T15:33:51.184Z"
+    },
+    {
+      "id": 6,
+      "title": "Discord UX completion: kill restart-sentinel trailer entirely, add inbound 'Working…' ack, add compaction sentinel, verify granular live edits work, fix post-compaction 'Invalid URL' that caused 20-min silence",
+      "description": "",
+      "status": "done",
+      "verify": "pnpm exec tsc --noEmit --pretty false --project extensions/discord/tsconfig.json && node scripts/test-projects.mjs extensions/discord/src/draft-stream.test.ts extensions/discord/src/monitor/message-handler.process.test.ts && ! rg -n 'Reason:|Run:|Summary:' extensions/discord/src && echo OK",
+      "createdAt": "2026-04-28T16:20:59.040Z",
+      "history": [
+        {
+          "action": "created",
+          "timestamp": "2026-04-28T16:20:59.040Z"
+        },
+        {
+          "action": "started",
+          "timestamp": "2026-04-28T16:38:56.428Z"
+        },
+        {
+          "action": "updated",
+          "timestamp": "2026-04-28T16:45:02.739Z",
+          "details": "verify → \"pnpm exec tsc --noEmit --pretty false --project extensions/discord/tsconfig.json && node scripts/test-projects.mjs extensions/discord/src/draft-stream.test.ts extensions/discord/src/monitor/message-handler.process.test.ts && ! rg -n 'Reason:|Run:|Summary:' extensions/discord/src && echo OK\""
+        },
+        {
+          "action": "verify-started",
+          "timestamp": "2026-04-28T16:47:02.282Z"
+        },
+        {
+          "action": "verified",
+          "timestamp": "2026-04-28T16:47:11.124Z",
+          "details": "\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.4 \u001b[39m\u001b[90m/Users/n3v3rd1e/ravenquill/software/openclaw\u001b[39m\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m extension-discord \u001b[49m\u001b[39m extensions/discord/src/monitor/message-handler.process.test.ts \u001b[2m(\u001b[22m\u001b[2m33 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 140\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m extension-discord \u001b[49m\u001b[39m extensions/discord/src/draft-stream.test.ts \u001b[2m(\u001b[22m\u001b[2m5 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m2 passed\u001b[39m\u001b[22m\u001b[90m (2)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m38 passed\u001b[39m\u001b[22m\u001b[90m (38)\u001b[39m\n\u001b[2m   Start at \u001b[22m 18:47:07\n\u001b[2m   Duration \u001b[22m 3.54s\u001b[2m (transform 1.65s, setup 59ms, import 3.23s, tests 142ms, environment 0ms)\u001b[22m\n\nOK"
+        },
+        {
+          "action": "verify-started",
+          "timestamp": "2026-04-28T16:48:34.134Z"
+        },
+        {
+          "action": "verified",
+          "timestamp": "2026-04-28T16:48:43.136Z",
+          "details": "\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.4 \u001b[39m\u001b[90m/Users/n3v3rd1e/ravenquill/software/openclaw\u001b[39m\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m extension-discord \u001b[49m\u001b[39m extensions/discord/src/monitor/message-handler.process.test.ts \u001b[2m(\u001b[22m\u001b[2m33 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 156\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m extension-discord \u001b[49m\u001b[39m extensions/discord/src/draft-stream.test.ts \u001b[2m(\u001b[22m\u001b[2m5 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m2 passed\u001b[39m\u001b[22m\u001b[90m (2)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m38 passed\u001b[39m\u001b[22m\u001b[90m (38)\u001b[39m\n\u001b[2m   Start at \u001b[22m 18:48:39\n\u001b[2m   Duration \u001b[22m 3.71s\u001b[2m (transform 1.65s, setup 55ms, import 3.39s, tests 158ms, environment 0ms)\u001b[22m\n\nOK"
+        }
+      ],
+      "startedAt": "2026-04-28T16:38:56.428Z",
+      "completedAt": "2026-04-28T16:48:43.136Z"
     }
   ],
-  "nextId": 5
+  "nextId": 7
 }
