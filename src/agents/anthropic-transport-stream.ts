@@ -429,8 +429,24 @@ function mapStopReason(reason: string | undefined): string {
   }
 }
 
-function resolveAnthropicMessagesUrl(baseUrl?: string): string {
-  const normalized = (baseUrl?.trim() || "https://api.anthropic.com").replace(/\/+$/, "");
+function resolveAnthropicMessagesBaseUrl(params: { baseUrl?: string; provider?: string }): string {
+  const raw = params.baseUrl?.trim();
+  const provider = normalizeLowercaseStringOrEmpty(params.provider);
+  const shouldUseDefault = !raw || (provider === "claude-cli" && /^(?:undefined|null)$/i.test(raw));
+  const normalized = (shouldUseDefault ? "https://api.anthropic.com" : raw).replace(/\/+$/, "");
+  try {
+    // Validate here so callers never hand fetch() a relative URL and surface only
+    // the unhelpful Node "Invalid URL" message. Claude CLI OAuth imports do not
+    // carry endpoint state; stale synthesized values must fall back to Anthropic.
+    new URL(normalized);
+  } catch {
+    throw new Error(`Invalid Anthropic baseUrl for provider ${provider || "anthropic"}`);
+  }
+  return normalized;
+}
+
+function resolveAnthropicMessagesUrl(params: { baseUrl?: string; provider?: string }): string {
+  const normalized = resolveAnthropicMessagesBaseUrl(params);
   return normalized.endsWith("/v1") ? `${normalized}/messages` : `${normalized}/v1/messages`;
 }
 
@@ -482,10 +498,11 @@ function createAnthropicMessagesClient(params: {
   apiKey?: string | null;
   authToken?: string;
   baseURL?: string;
+  provider?: string;
   defaultHeaders?: Record<string, string>;
   fetch: typeof fetch;
 }): AnthropicMessagesClient {
-  const url = resolveAnthropicMessagesUrl(params.baseURL);
+  const url = resolveAnthropicMessagesUrl({ baseUrl: params.baseURL, provider: params.provider });
   return {
     messages: {
       async *stream(body: Record<string, unknown>, options?: { signal?: AbortSignal }) {
@@ -536,6 +553,7 @@ function createAnthropicTransportClient(params: {
         apiKey: null,
         authToken: apiKey,
         baseURL: model.baseUrl,
+        provider: model.provider,
         defaultHeaders: mergeTransportHeaders(
           {
             accept: "application/json",
@@ -564,6 +582,7 @@ function createAnthropicTransportClient(params: {
         apiKey: null,
         authToken: apiKey,
         baseURL: model.baseUrl,
+        provider: model.provider,
         defaultHeaders: mergeTransportHeaders(
           {
             accept: "application/json",
@@ -584,6 +603,7 @@ function createAnthropicTransportClient(params: {
     client: createAnthropicMessagesClient({
       apiKey,
       baseURL: model.baseUrl,
+      provider: model.provider,
       defaultHeaders: mergeTransportHeaders(
         {
           accept: "application/json",

@@ -43,6 +43,8 @@ function makeAnthropicTransportModel(
     reasoning?: boolean;
     maxTokens?: number;
     headers?: Record<string, string>;
+    provider?: string;
+    baseUrl?: string;
     requestTransport?: RequestTransportConfig;
   } = {},
 ): AnthropicMessagesModel {
@@ -51,8 +53,8 @@ function makeAnthropicTransportModel(
       id: params.id ?? "claude-sonnet-4-6",
       name: params.name ?? "Claude Sonnet 4.6",
       api: "anthropic-messages",
-      provider: "anthropic",
-      baseUrl: "https://api.anthropic.com",
+      provider: params.provider ?? "anthropic",
+      baseUrl: params.baseUrl ?? "https://api.anthropic.com",
       reasoning: params.reasoning ?? true,
       input: ["text"],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -412,5 +414,25 @@ describe("anthropic transport stream", () => {
       thinking: { type: "adaptive" },
       output_config: { effort: "xhigh" },
     });
+  });
+  it("falls back to the default Anthropic URL for stale claude-cli OAuth baseUrl sentinels", async () => {
+    guardedFetchMock.mockResolvedValueOnce(createSseResponse([]));
+    const model = makeAnthropicTransportModel({
+      provider: "claude-cli",
+      baseUrl: "undefined",
+    });
+    await runTransportStream(
+      model,
+      {
+        systemPrompt: "",
+        messages: [{ role: "user", content: "hello" }],
+      } as AnthropicStreamContext,
+      { apiKey: "sk-ant-oat-example" } as AnthropicStreamOptions,
+    );
+
+    expect(guardedFetchMock).toHaveBeenCalledWith(
+      "https://api.anthropic.com/v1/messages",
+      expect.any(Object),
+    );
   });
 });
