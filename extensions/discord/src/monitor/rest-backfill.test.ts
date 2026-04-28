@@ -7,6 +7,7 @@ vi.mock("openclaw/plugin-sdk/state-paths", () => ({
 }));
 
 import { rm } from "node:fs/promises";
+import type { DiscordMessageHandler } from "./listeners.js";
 import { startDiscordRestBackfill } from "./rest-backfill.js";
 
 const TEST_NOW_MS = 4_102_444_800_000;
@@ -42,7 +43,7 @@ describe("Discord REST backfill", () => {
 
   it("polls configured channels and dispatches missed user messages once", async () => {
     const get = vi.fn(async () => [makeMessage(snowflake(2_000)), makeMessage(snowflake(1_000))]);
-    const handler = vi.fn(async () => undefined);
+    const handler = vi.fn<DiscordMessageHandler>(async () => undefined);
     const handle = startDiscordRestBackfill({
       accountId: "default",
       client: { rest: { get } } as never,
@@ -71,7 +72,7 @@ describe("Discord REST backfill", () => {
         author: { id: "bot", username: "Quill", discriminator: "0" },
       },
     ]);
-    const handler = vi.fn(async () => undefined);
+    const handler = vi.fn<DiscordMessageHandler>(async () => undefined);
     const handle = startDiscordRestBackfill({
       accountId: "default",
       client: { rest: { get } } as never,

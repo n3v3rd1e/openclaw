@@ -47,6 +47,16 @@ function normalizePositiveInteger(value: unknown, fallback: number, max: number)
   return Math.min(Math.max(Math.floor(value), 1), max);
 }
 
+function isPermanentChannelError(err: unknown): boolean {
+  const e = err as { status?: number; code?: number; message?: string } | null | undefined;
+  if (!e) return false;
+  if (e.status === 403 || e.status === 401 || e.status === 404) return true;
+  // Discord API JSON error codes: 50001 Missing Access, 50013 Missing Permissions, 10003 Unknown Channel
+  if (e.code === 50001 || e.code === 50013 || e.code === 10003) return true;
+  const msg = typeof e.message === "string" ? e.message : "";
+  return /Missing Access|Missing Permissions|Unknown Channel/i.test(msg);
+}
+
 function snowflakeFromTimestampMs(timestampMs: number): string {
   const clamped = Math.max(0, Math.floor(timestampMs));
   return String((BigInt(clamped) - DISCORD_EPOCH_MS) << 22n);
@@ -237,6 +247,8 @@ export function startDiscordRestBackfill(params: {
   let state: DiscordRestBackfillState | undefined;
   let channelIds: string[] = [];
   const channelGuildIds = new Map<string, string>();
+  const skipChannels = new Set<string>();
+  const loggedChannelErrors = new Set<string>();
 
   const loadChannels = async () => {
     const configured = resolveConfiguredChannelIds({
@@ -269,15 +281,37 @@ export function startDiscordRestBackfill(params: {
       const nowSeed = snowflakeFromTimestampMs(Date.now() - (config.startupLookbackMs ?? 0));
       let changed = false;
       for (const channelId of channelIds) {
+        if (skipChannels.has(channelId)) {
+          continue;
+        }
         const after = state.channels[channelId] ?? nowSeed;
         if (!state.channels[channelId]) {
           state.channels[channelId] = after;
           changed = true;
         }
-        const messages = (await rest.get!(Routes.channelMessages(channelId), {
-          limit,
-          after,
-        })) as APIMessage[];
+        let messages: APIMessage[];
+        try {
+          messages = (await rest.get!(Routes.channelMessages(channelId), {
+            limit,
+            after,
+          })) as APIMessage[];
+        } catch (err) {
+          if (isPermanentChannelError(err)) {
+            skipChannels.add(channelId);
+            if (!loggedChannelErrors.has(channelId)) {
+              loggedChannelErrors.add(channelId);
+              logVerbose(
+                `discord backfill: skipping channel ${channelId} permanently: ${String(err)}`,
+              );
+            }
+          } else if (!loggedChannelErrors.has(channelId)) {
+            loggedChannelErrors.add(channelId);
+            params.runtime.error?.(
+              danger(`discord backfill: channel ${channelId} fetch failed: ${String(err)}`),
+            );
+          }
+          continue;
+        }
         if (!Array.isArray(messages) || messages.length === 0) {
           continue;
         }

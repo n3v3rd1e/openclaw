@@ -161,6 +161,7 @@ function createGatewayStatusObserver(params: {
   let readyPollId: ReturnType<typeof setInterval> | undefined;
   let readyTimeoutId: ReturnType<typeof setTimeout> | undefined;
   let reconnectTimeoutId: ReturnType<typeof setTimeout> | undefined;
+  let connectedLogged = false;
 
   const shouldStop = () => params.abortSignal?.aborted || params.isLifecycleStopping();
   const clearReadyWatch = () => {
@@ -193,6 +194,10 @@ function createGatewayStatusObserver(params: {
       lastDisconnect: null,
       lastError: null,
     });
+    if (!connectedLogged) {
+      connectedLogged = true;
+      params.runtime.log?.("discord gateway connected (READY received)");
+    }
   };
   const startReconnectWatch = (reason: string, scheduledDelayMs: number) => {
     clearReconnectWatch();
