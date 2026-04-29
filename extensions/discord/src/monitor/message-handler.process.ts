@@ -86,6 +86,17 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
+// User-facing draft header. Refreshing the timestamp on every draft mutation
+// lets the human eyeball "is this stuck or just slow?" without the agent
+// needing to send heartbeat messages.
+export function formatDraftHeader(now: Date = new Date()): string {
+  const time = now.toLocaleTimeString("en-GB", {
+    timeZone: "Europe/Bratislava",
+    hour12: false,
+  });
+  return `Working… · ${time}`;
+}
+
 const DISCORD_TYPING_MAX_DURATION_MS = 20 * 60_000;
 let replyRuntimePromise: Promise<typeof import("openclaw/plugin-sdk/reply-runtime")> | undefined;
 
@@ -640,7 +651,7 @@ export async function processDiscordMessage(
     if (!draftStream) {
       return;
     }
-    const ackText = "Working…";
+    const ackText = formatDraftHeader();
     lastPartialText = ackText;
     draftText = ackText;
     draftStream.update(ackText);
@@ -660,9 +671,10 @@ export async function processDiscordMessage(
       return;
     }
     previewToolProgressLines = [...previewToolProgressLines, normalized].slice(-8);
-    const previewText = ["Working…", ...previewToolProgressLines.map((entry) => `• ${entry}`)].join(
-      "\n",
-    );
+    const previewText = [
+      formatDraftHeader(),
+      ...previewToolProgressLines.map((entry) => `• ${entry}`),
+    ].join("\n");
     lastPartialText = previewText;
     draftText = previewText;
     hasStreamedMessage = true;

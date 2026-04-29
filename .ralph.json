@@ -278,17 +278,30 @@
           "action": "verified",
           "timestamp": "2026-04-28T18:50:47.584Z",
           "details": "\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.4 \u001b[39m\u001b[90m/Users/n3v3rd1e/ravenquill/software/openclaw\u001b[39m\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[45m unit-fast \u001b[49m\u001b[39m ../../src/agents/pi-hooks/compaction-instructions.test.ts \u001b[2m(\u001b[22m\u001b[2m36 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 9\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[46m agents \u001b[49m\u001b[39m ../../src/agents/pi-embedded-runner/run/preemptive-compaction.test.ts \u001b[2m(\u001b[22m\u001b[2m11 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 59\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m2 passed\u001b[39m\u001b[22m\u001b[90m (2)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m47 passed\u001b[39m\u001b[22m\u001b[90m (47)\u001b[39m\n\u001b[2m   Start at \u001b[22m 20:50:46\n\u001b[2m   Duration \u001b[22m 1.07s\u001b[2m (transform 143ms, setup 47ms, import 810ms, tests 68ms, environment 0ms)\u001b[22m"
+        },
+        {
+          "action": "started",
+          "timestamp": "2026-04-28T20:25:20.087Z"
+        },
+        {
+          "action": "verify-started",
+          "timestamp": "2026-04-29T07:57:41.169Z"
+        },
+        {
+          "action": "verified",
+          "timestamp": "2026-04-29T07:58:15.759Z",
+          "details": "\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.4 \u001b[39m\u001b[90m/Users/n3v3rd1e/ravenquill/software/openclaw\u001b[39m\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[45m unit-fast \u001b[49m\u001b[39m ../../src/agents/pi-hooks/compaction-instructions.test.ts \u001b[2m(\u001b[22m\u001b[2m36 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 9\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[46m agents \u001b[49m\u001b[39m ../../src/agents/pi-embedded-runner/run/preemptive-compaction.test.ts \u001b[2m(\u001b[22m\u001b[2m11 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 75\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m2 passed\u001b[39m\u001b[22m\u001b[90m (2)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m47 passed\u001b[39m\u001b[22m\u001b[90m (47)\u001b[39m\n\u001b[2m   Start at \u001b[22m 09:58:14\n\u001b[2m   Duration \u001b[22m 1.05s\u001b[2m (transform 186ms, setup 54ms, import 778ms, tests 84ms, environment 0ms)\u001b[22m"
         }
       ],
-      "startedAt": "2026-04-28T18:49:56.785Z",
-      "completedAt": "2026-04-28T18:50:47.584Z"
+      "startedAt": "2026-04-28T20:25:20.087Z",
+      "completedAt": "2026-04-29T07:58:15.759Z"
     },
     {
       "id": 8,
       "title": "Merge compaction improvement, build, restart gateway",
       "description": "",
-      "status": "in-progress",
-      "verify": "",
+      "status": "done",
+      "verify": "openclaw gateway status",
       "createdAt": "2026-04-28T18:49:56.733Z",
       "history": [
         {
@@ -298,10 +311,107 @@
         {
           "action": "started",
           "timestamp": "2026-04-28T18:50:47.609Z"
+        },
+        {
+          "action": "updated",
+          "timestamp": "2026-04-29T07:58:55.948Z",
+          "details": "verify → \"openclaw gateway status\""
+        },
+        {
+          "action": "verify-started",
+          "timestamp": "2026-04-29T07:58:55.970Z"
+        },
+        {
+          "action": "verified",
+          "timestamp": "2026-04-29T07:58:57.792Z",
+          "details": "Service: LaunchAgent (loaded)\nFile logs: /tmp/openclaw/openclaw-2026-04-29.log\nCommand: /opt/homebrew/opt/node/bin/node /Users/n3v3rd1e/ravenquill/software/openclaw/dist/index.js gateway --port 18789\nService file: ~/Library/LaunchAgents/ai.openclaw.gateway.plist\nService env: OPENCLAW_GATEWAY_PORT=18789\n\nConfig (cli): ~/.openclaw/openclaw.json\nConfig (service): ~/.openclaw/openclaw.json\n\nGateway: bind=lan (0.0.0.0), port=18789 (service args)\nProbe target: wss://127.0.0.1:18789\nDashboard: http://192.168.1.168:18789/\nProbe note: bind=lan listens on 0.0.0.0 (all interfaces); probing via 127.0.0.1.\n\nRuntime: running (pid 28060, state active)\nConnectivity probe: ok\nCapability: admin-capable\n\nListening: *:18789\nTroubles: run openclaw status\nTroubleshooting: https://docs.openclaw.ai/troubleshooting"
         }
       ],
-      "startedAt": "2026-04-28T18:50:47.609Z"
+      "startedAt": "2026-04-28T18:50:47.609Z",
+      "completedAt": "2026-04-29T07:58:57.792Z"
+    },
+    {
+      "id": 9,
+      "title": "Create Mikona ANPR and Pricing agents bound to Discord channels",
+      "description": "",
+      "status": "done",
+      "verify": "python3 -c \"import json,pathlib; c=json.loads(pathlib.Path('/Users/n3v3rd1e/.openclaw/openclaw.json').read_text()); ids={a.get('id') for a in c.get('agents',{}).get('list',[])}; assert {'mikona-anpr','mikona-pricing'} <= ids; bindings={(b.get('agentId'), b.get('match',{}).get('peer',{}).get('id')) for b in c.get('bindings',[])}; assert ('mikona-anpr','1498780844918309055') in bindings; assert ('mikona-pricing','1498780848055521340') in bindings; root=pathlib.Path('/Users/n3v3rd1e/.openclaw/agents'); files=['SOUL.md','AGENTS.md','TOOLS.md','IDENTITY.md','MEMORY.md','HEARTBEAT.md','USER.md']; assert all((root/d/f).exists() for d in ['mikona-anpr','mikona-pricing'] for f in files); print('OK')\"",
+      "createdAt": "2026-04-28T20:25:20.028Z",
+      "history": [
+        {
+          "action": "created",
+          "timestamp": "2026-04-28T20:25:20.028Z"
+        },
+        {
+          "action": "started",
+          "timestamp": "2026-04-29T07:57:41.146Z"
+        },
+        {
+          "action": "updated",
+          "timestamp": "2026-04-29T07:58:57.814Z",
+          "details": "verify → \"python3 scripts/verify-mikona-agents.mjs\""
+        },
+        {
+          "action": "updated",
+          "timestamp": "2026-04-29T07:59:06.063Z",
+          "details": "verify → \"python3 -c \"import json,pathlib; c=json.loads(pathlib.Path('/Users/n3v3rd1e/.openclaw/openclaw.json').read_text()); ids={a.get('id') for a in c.get('agents',{}).get('list',[])}; assert {'mikona-anpr','mikona-pricing'} <= ids; bindings={(b.get('agentId'), b.get('match',{}).get('peer',{}).get('id')) for b in c.get('bindings',[])}; assert ('mikona-anpr','1498780844918309055') in bindings; assert ('mikona-pricing','1498780848055521340') in bindings; import pathlib as p; [(__import__('builtins').all([(p.Path('/Users/n3v3rd1e/.openclaw/agents')/d/f).exists() for f in ['SOUL.md','AGENTS.md','TOOLS.md','IDENTITY.md','MEMORY.md','HEARTBEAT.md','USER.md']])) or (_ for _ in ()).throw(AssertionError(d))) for d in ['mikona-anpr','mikona-pricing']]; print('OK')\"\""
+        },
+        {
+          "action": "verify-started",
+          "timestamp": "2026-04-29T07:59:06.084Z"
+        },
+        {
+          "action": "verify-failed",
+          "timestamp": "2026-04-29T07:59:06.156Z",
+          "details": "File \"<string>\", line 1\n    import json,pathlib; c=json.loads(pathlib.Path('/Users/n3v3rd1e/.openclaw/openclaw.json').read_text()); ids={a.get('id') for a in c.get('agents',{}).get('list',[])}; assert {'mikona-anpr','mikona-pricing'} <= ids; bindings={(b.get('agentId'), b.get('match',{}).get('peer',{}).get('id')) for b in c.get('bindings',[])}; assert ('mikona-anpr','1498780844918309055') in bindings; assert ('mikona-pricing','1498780848055521340') in bindings; import pathlib as p; [(__import__('builtins').all([(p.Path('/Users/n3v3rd1e/.openclaw/agents')/d/f).exists() for f in ['SOUL.md','AGENTS.md','TOOLS.md','IDENTITY.md','MEMORY.md','HEARTBEAT.md','USER.md']])) or (_ for _ in ()).throw(AssertionError(d))) for d in ['mikona-anpr','mikona-pricing']]; print('OK')\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ^\nSyntaxError: closing parenthesis ')' does not match opening parenthesis '['"
+        },
+        {
+          "action": "updated",
+          "timestamp": "2026-04-29T07:59:13.004Z",
+          "details": "verify → \"python3 -c \"import json,pathlib; c=json.loads(pathlib.Path('/Users/n3v3rd1e/.openclaw/openclaw.json').read_text()); ids={a.get('id') for a in c.get('agents',{}).get('list',[])}; assert {'mikona-anpr','mikona-pricing'} <= ids; bindings={(b.get('agentId'), b.get('match',{}).get('peer',{}).get('id')) for b in c.get('bindings',[])}; assert ('mikona-anpr','1498780844918309055') in bindings; assert ('mikona-pricing','1498780848055521340') in bindings; root=pathlib.Path('/Users/n3v3rd1e/.openclaw/agents'); files=['SOUL.md','AGENTS.md','TOOLS.md','IDENTITY.md','MEMORY.md','HEARTBEAT.md','USER.md']; assert all((root/d/f).exists() for d in ['mikona-anpr','mikona-pricing'] for f in files); print('OK')\"\""
+        },
+        {
+          "action": "verify-started",
+          "timestamp": "2026-04-29T07:59:13.027Z"
+        },
+        {
+          "action": "verified",
+          "timestamp": "2026-04-29T07:59:13.068Z",
+          "details": "OK"
+        }
+      ],
+      "startedAt": "2026-04-29T07:57:41.146Z",
+      "completedAt": "2026-04-29T07:59:13.068Z"
+    },
+    {
+      "id": 10,
+      "title": "Discord draft preview header — show 'Working… HH:MM:SS' timestamp that updates on every draft mutation so user can tell stuck vs slow",
+      "description": "",
+      "status": "done",
+      "verify": "pnpm tsgo:test:extensions && node scripts/test-projects.mjs extensions/discord/src/monitor/message-handler.process.test.ts",
+      "createdAt": "2026-04-29T07:51:42.266Z",
+      "history": [
+        {
+          "action": "created",
+          "timestamp": "2026-04-29T07:51:42.267Z"
+        },
+        {
+          "action": "started",
+          "timestamp": "2026-04-29T07:51:45.183Z"
+        },
+        {
+          "action": "verify-started",
+          "timestamp": "2026-04-29T07:58:24.339Z"
+        },
+        {
+          "action": "verified",
+          "timestamp": "2026-04-29T07:58:46.890Z",
+          "details": "> openclaw@2026.4.23 tsgo:test:extensions /Users/n3v3rd1e/ravenquill/software/openclaw\n> pnpm tsgo:extensions:test\n\n\n> openclaw@2026.4.23 tsgo:extensions:test /Users/n3v3rd1e/ravenquill/software/openclaw\n> node scripts/run-tsgo.mjs -p tsconfig.extensions.test.json --incremental --tsBuildInfoFile .artifacts/tsgo-cache/extensions-test.tsbuildinfo\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.4 \u001b[39m\u001b[90m/Users/n3v3rd1e/ravenquill/software/openclaw\u001b[39m\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m extension-discord \u001b[49m\u001b[39m extensions/discord/src/monitor/message-handler.process.test.ts \u001b[2m(\u001b[22m\u001b[2m35 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 116\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m35 passed\u001b[39m\u001b[22m\u001b[90m (35)\u001b[39m\n\u001b[2m   Start at \u001b[22m 09:58:43\n\u001b[2m   Duration \u001b[22m 3.29s\u001b[2m (transform 1.41s, setup 48ms, import 3.03s, tests 116ms, environment 0ms)\u001b[22m"
+        }
+      ],
+      "startedAt": "2026-04-29T07:51:45.183Z",
+      "completedAt": "2026-04-29T07:58:46.890Z"
     }
   ],
-  "nextId": 9
+  "nextId": 11
 }

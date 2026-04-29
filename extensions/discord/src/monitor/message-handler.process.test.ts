@@ -2,6 +2,8 @@ import { DEFAULT_EMOJIS } from "openclaw/plugin-sdk/channel-feedback";
 import type { ReplyPayload } from "openclaw/plugin-sdk/reply-dispatch-runtime";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+const WORKING_HEADER_RE = /^Working… · \d{2}:\d{2}:\d{2}$/;
+
 const sendMocks = vi.hoisted(() => ({
   reactMessageDiscord: vi.fn<
     (channelId: string, messageId: string, emoji: string, opts?: unknown) => Promise<void>
@@ -755,7 +757,7 @@ describe("processDiscordMessage draft streaming", () => {
 
     await runSingleChunkFinalScenario({ streamMode: "partial", maxLinesPerMessage: 5 });
 
-    expect(draftStream.update).toHaveBeenNthCalledWith(1, "Working…");
+    expect(draftStream.update.mock.calls[0]?.[0]).toMatch(WORKING_HEADER_RE);
     expect(draftStream.flush).toHaveBeenCalledBefore(dispatchInboundMessage);
     expectSinglePreviewEdit();
   });
@@ -925,7 +927,8 @@ describe("processDiscordMessage draft streaming", () => {
     await processDiscordMessage(ctx as any);
 
     const updates = draftStream.update.mock.calls.map((call) => call[0]);
-    expect(updates).toEqual(["Working…", "Hello", "HelloWorld"]);
+    expect(updates[0]).toMatch(WORKING_HEADER_RE);
+    expect(updates.slice(1)).toEqual(["Hello", "HelloWorld"]);
   });
 
   it("strips reply tags from preview partials", async () => {
@@ -957,10 +960,10 @@ describe("processDiscordMessage draft streaming", () => {
 
     await runInPartialStreamMode();
 
-    expect(draftStream.update.mock.calls.map((call) => call[0])).toEqual([
-      "Working…",
-      "Working…\n• tool: read",
-    ]);
+    const updates = draftStream.update.mock.calls.map((call) => call[0]);
+    expect(updates).toHaveLength(2);
+    expect(updates[0]).toMatch(WORKING_HEADER_RE);
+    expect(updates[1]).toMatch(/^Working… · \d{2}:\d{2}:\d{2}\n• tool: read$/);
     expect(
       dispatchInboundMessage.mock.calls[0]?.[0]?.replyOptions?.suppressDefaultToolProgressMessages,
     ).toBe(true);
@@ -977,11 +980,15 @@ describe("processDiscordMessage draft streaming", () => {
 
     await runInPartialStreamMode();
 
-    expect(draftStream.update.mock.calls.map((call) => call[0])).toEqual([
-      "Working…",
-      "Working…\n• Compacting context — back in a moment.",
-      "Working…\n• Compacting context — back in a moment.\n• Compaction finished; resuming.",
-    ]);
+    const updates = draftStream.update.mock.calls.map((call) => call[0]);
+    expect(updates).toHaveLength(3);
+    expect(updates[0]).toMatch(WORKING_HEADER_RE);
+    expect(updates[1]).toMatch(
+      /^Working… · \d{2}:\d{2}:\d{2}\n• Compacting context — back in a moment\.$/,
+    );
+    expect(updates[2]).toMatch(
+      /^Working… · \d{2}:\d{2}:\d{2}\n• Compacting context — back in a moment\.\n• Compaction finished; resuming\.$/,
+    );
   });
 
   it("forces new preview messages on assistant boundaries in block mode", async () => {
@@ -1030,6 +1037,21 @@ describe("processDiscordMessage draft streaming", () => {
 
     await runInPartialStreamMode();
 
-    expect(draftStream.update.mock.calls.map((call) => call[0])).toEqual(["Working…"]);
+    const updates = draftStream.update.mock.calls.map((call) => call[0]);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatch(WORKING_HEADER_RE);
+  });
+});
+
+describe("formatDraftHeader", () => {
+  it("renders Bratislava-local time as HH:MM:SS", async () => {
+    const { formatDraftHeader } = await import("./message-handler.process.js");
+    // 2026-04-29T07:30:45Z = 09:30:45 in Europe/Bratislava (CEST)
+    expect(formatDraftHeader(new Date("2026-04-29T07:30:45Z"))).toBe("Working… · 09:30:45");
+  });
+
+  it("matches the live header pattern", async () => {
+    const { formatDraftHeader } = await import("./message-handler.process.js");
+    expect(formatDraftHeader()).toMatch(WORKING_HEADER_RE);
   });
 });
