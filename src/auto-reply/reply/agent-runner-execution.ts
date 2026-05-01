@@ -11,6 +11,7 @@ import {
 import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-budget.js";
 import { runCliAgent } from "../../agents/cli-runner.js";
 import { getCliSessionBinding } from "../../agents/cli-session.js";
+import { persistCliTurnTranscript } from "../../agents/command/attempt-execution.js";
 import { LiveSessionModelSwitchError } from "../../agents/live-model-switch-error.js";
 import { runWithModelFallback, isFallbackSummaryError } from "../../agents/model-fallback.js";
 import { isCliProvider } from "../../agents/model-selection.js";
@@ -966,6 +967,26 @@ export async function runAgentTurnWithFallback(params: {
                   },
                 });
                 lifecycleTerminalEmitted = true;
+
+                if (params.sessionKey) {
+                  try {
+                    await persistCliTurnTranscript({
+                      body: params.commandBody,
+                      result,
+                      sessionId: params.followupRun.run.sessionId,
+                      sessionKey: params.sessionKey,
+                      sessionEntry: params.getActiveSessionEntry(),
+                      sessionStore: params.activeSessionStore,
+                      storePath: params.storePath,
+                      sessionAgentId: params.followupRun.run.agentId,
+                      sessionCwd: params.followupRun.run.workspaceDir,
+                    });
+                  } catch (persistErr) {
+                    logVerbose(
+                      `CLI transcript persistence failed for ${params.sessionKey}: ${formatErrorMessage(persistErr)}`,
+                    );
+                  }
+                }
 
                 return result;
               } catch (err) {
