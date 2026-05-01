@@ -1882,10 +1882,8 @@ export const chatHandlers: GatewayRequestHandlers = {
       provider: resolvedSessionModel.provider,
       localMessages,
     });
-    const hardMax = 1000;
-    const defaultLimit = 200;
-    const requested = typeof limit === "number" ? limit : defaultLimit;
-    const max = Math.min(hardMax, requested);
+    const explicitLimitMax = 5000;
+    const max = typeof limit === "number" ? Math.min(explicitLimitMax, limit) : rawMessages.length;
     const effectiveMaxChars = resolveEffectiveChatHistoryMaxChars(cfg, maxChars);
     const sliced = rawMessages.length > max ? rawMessages.slice(-max) : rawMessages;
     const sanitized = stripEnvelopeFromMessages(sliced);

@@ -519,8 +519,8 @@ describe("gateway server chat", () => {
       });
       expect(defaultRes.ok).toBe(true);
       const defaultMsgs = defaultRes.payload?.messages ?? [];
-      expect(defaultMsgs.length).toBe(200);
-      expect(extractFirstTextBlock(defaultMsgs[0])).toBe("m100");
+      expect(defaultMsgs.length).toBe(300);
+      expect(extractFirstTextBlock(defaultMsgs[0])).toBe("m0");
     } finally {
       testState.agentConfig = undefined;
       testState.sessionStorePath = undefined;

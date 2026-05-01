@@ -153,7 +153,6 @@ export async function loadChatHistory(state: ChatState) {
           "chat.history",
           {
             sessionKey,
-            limit: 200,
           },
         );
         break;
