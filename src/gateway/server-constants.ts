@@ -4,7 +4,7 @@ export const MAX_PAYLOAD_BYTES = 25 * 1024 * 1024;
 export const MAX_BUFFERED_BYTES = 50 * 1024 * 1024; // per-connection send buffer limit (2x max payload)
 export const MAX_PREAUTH_PAYLOAD_BYTES = 64 * 1024;
 
-const DEFAULT_MAX_CHAT_HISTORY_MESSAGES_BYTES = 20 * 1024 * 1024; // keep history responses under the 25 MiB client WS limit while allowing long dashboards
+const DEFAULT_MAX_CHAT_HISTORY_MESSAGES_BYTES = 6 * 1024 * 1024; // keep history responses comfortably under client WS limits
 let maxChatHistoryMessagesBytes = DEFAULT_MAX_CHAT_HISTORY_MESSAGES_BYTES;
 
 export const getMaxChatHistoryMessagesBytes = () => maxChatHistoryMessagesBytes;
