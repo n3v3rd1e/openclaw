@@ -13,7 +13,11 @@ import { runCliAgent } from "../../agents/cli-runner.js";
 import { getCliSessionBinding } from "../../agents/cli-session.js";
 import { persistCliTurnTranscript } from "../../agents/command/attempt-execution.js";
 import { LiveSessionModelSwitchError } from "../../agents/live-model-switch-error.js";
-import { runWithModelFallback, isFallbackSummaryError } from "../../agents/model-fallback.js";
+import {
+  runWithModelFallback,
+  isFallbackSummaryError,
+  type ModelFallbackRunOptions,
+} from "../../agents/model-fallback.js";
 import { isCliProvider } from "../../agents/model-selection.js";
 import {
   BILLING_ERROR_USER_MESSAGE,
@@ -116,6 +120,59 @@ export type AgentRunLoopResult =
       directlySentBlockKeys?: Set<string>;
     }
   | { kind: "final"; payload: ReplyPayload };
+
+function formatModelRef(provider?: string, model?: string): string {
+  const providerText = normalizeOptionalString(provider) ?? "unknown-provider";
+  const modelText = normalizeOptionalString(model) ?? "unknown-model";
+  return `${providerText}/${modelText}`;
+}
+
+function formatFallbackAttemptForPrompt(attempt: RuntimeFallbackAttempt): string {
+  const reason = normalizeOptionalString(attempt.reason)?.replace(/_/g, " ") ?? "unknown";
+  const status = typeof attempt.status === "number" ? ` HTTP ${attempt.status}` : "";
+  const detail = normalizeOptionalString(attempt.error);
+  return `- ${formatModelRef(attempt.provider, attempt.model)} failed: ${reason}${status}${
+    detail ? ` — ${detail}` : ""
+  }`;
+}
+
+function buildFallbackHandoffPrompt(params: {
+  provider: string;
+  model?: string;
+  runOptions?: ModelFallbackRunOptions;
+}): string | undefined {
+  const attempts = params.runOptions?.previousAttempts ?? [];
+  if (attempts.length === 0) {
+    return undefined;
+  }
+  const selected = formatModelRef(
+    params.runOptions?.selectedProvider,
+    params.runOptions?.selectedModel,
+  );
+  const active = formatModelRef(params.provider, params.model);
+  const attemptLines = attempts.slice(-3).map(formatFallbackAttemptForPrompt).join("\n");
+  return [
+    "Model fallback handoff:",
+    `The originally selected model was ${selected}. You are now running as fallback model ${active}.`,
+    "Do not silently continue as if nothing happened.",
+    "Start your user-visible reply by saying that you are the fallback, why fallback happened, what state you can see, and what you propose to do next.",
+    "If continuing could perform risky, destructive, external, or low-confidence work, pause and ask for confirmation instead of acting.",
+    "Recent failed attempts:",
+    attemptLines,
+  ].join("\n");
+}
+
+function appendExtraSystemPrompt(
+  base: string | undefined,
+  addition: string | undefined,
+): string | undefined {
+  const extra = normalizeOptionalString(addition);
+  if (!extra) {
+    return base;
+  }
+  const existing = normalizeOptionalString(base);
+  return existing ? `${existing}\n\n${extra}` : extra;
+}
 
 type FallbackSelectionState = Pick<
   SessionEntry,
@@ -859,8 +916,14 @@ export async function runAgentTurnWithFallback(params: {
       const onToolResult = params.opts?.onToolResult;
       const fallbackResult = await runWithModelFallback({
         ...resolveModelFallbackOptions(params.followupRun.run),
+        passAttemptContext: true,
         runId,
         run: async (provider, model, runOptions) => {
+          const fallbackHandoffPrompt = buildFallbackHandoffPrompt({
+            provider,
+            model,
+            runOptions,
+          });
           // Notify that model selection is complete (including after fallback).
           // This allows responsePrefix template interpolation with the actual model.
           params.opts?.onModelSelected?.({
@@ -920,7 +983,10 @@ export async function runAgentTurnWithFallback(params: {
                   thinkLevel: params.followupRun.run.thinkLevel,
                   timeoutMs: params.followupRun.run.timeoutMs,
                   runId,
-                  extraSystemPrompt: params.followupRun.run.extraSystemPrompt,
+                  extraSystemPrompt: appendExtraSystemPrompt(
+                    params.followupRun.run.extraSystemPrompt,
+                    fallbackHandoffPrompt,
+                  ),
                   extraSystemPromptStatic: params.followupRun.run.extraSystemPromptStatic,
                   ownerNumbers: params.followupRun.run.ownerNumbers,
                   cliSessionId: cliSessionBinding?.sessionId,
@@ -1056,7 +1122,10 @@ export async function runAgentTurnWithFallback(params: {
                 ...runBaseParams,
                 sandboxSessionKey: params.runtimePolicySessionKey,
                 prompt: params.commandBody,
-                extraSystemPrompt: params.followupRun.run.extraSystemPrompt,
+                extraSystemPrompt: appendExtraSystemPrompt(
+                  params.followupRun.run.extraSystemPrompt,
+                  fallbackHandoffPrompt,
+                ),
                 toolResultFormat: (() => {
                   const channel = resolveMessageChannel(
                     params.sessionCtx.Surface,

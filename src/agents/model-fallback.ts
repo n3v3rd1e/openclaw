@@ -65,6 +65,10 @@ export function isFallbackSummaryError(err: unknown): err is FallbackSummaryErro
 
 export type ModelFallbackRunOptions = {
   allowTransientCooldownProbe?: boolean;
+  /** Failures that happened before this candidate. Non-empty means this is a fallback attempt. */
+  previousAttempts?: FallbackAttempt[];
+  selectedProvider?: string;
+  selectedModel?: string;
 };
 
 type ModelFallbackRunFn<T> = (
@@ -197,12 +201,20 @@ async function runFallbackAttempt<T>(params: {
   model: string;
   attempts: FallbackAttempt[];
   options?: ModelFallbackRunOptions;
+  passAttemptContext?: boolean;
 }): Promise<{ success: ModelFallbackRunResult<T> } | { error: unknown }> {
+  const previousAttempts = params.attempts.map((attempt) => ({ ...attempt }));
+  const options = params.passAttemptContext
+    ? {
+        ...params.options,
+        previousAttempts,
+      }
+    : params.options;
   const runResult = await runFallbackCandidate({
     run: params.run,
     provider: params.provider,
     model: params.model,
-    options: params.options,
+    options,
   });
   if (runResult.ok) {
     return {
@@ -659,6 +671,8 @@ export async function runWithModelFallback<T>(params: {
   fallbacksOverride?: string[];
   run: ModelFallbackRunFn<T>;
   onError?: ModelFallbackErrorHandler;
+  /** Include previous attempt metadata in run options for user-facing fallback handoff behavior. */
+  passAttemptContext?: boolean;
 }): Promise<ModelFallbackRunResult<T>> {
   const candidates = resolveFallbackCandidates({
     cfg: params.cfg,
@@ -773,7 +787,7 @@ export async function runWithModelFallback<T>(params: {
             });
             continue;
           }
-          runOptions = { allowTransientCooldownProbe: true };
+          runOptions = { ...runOptions, allowTransientCooldownProbe: true };
           if (isTransientCooldownReason) {
             transientProbeProviderForAttempt = candidate.provider;
           }
@@ -802,7 +816,14 @@ export async function runWithModelFallback<T>(params: {
       run: params.run,
       ...candidate,
       attempts,
-      options: runOptions,
+      options: params.passAttemptContext
+        ? {
+            ...runOptions,
+            selectedProvider: params.provider,
+            selectedModel: params.model,
+          }
+        : runOptions,
+      passAttemptContext: params.passAttemptContext,
     });
     if ("success" in attemptRun) {
       if (i > 0 || attempts.length > 0 || attemptedDuringCooldown) {

@@ -86,16 +86,36 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
-// User-facing draft header. Refreshing the timestamp on every draft mutation
-// lets the human eyeball "is this stuck or just slow?" without the agent
-// needing to send heartbeat messages.
-export function formatDraftHeader(now: Date = new Date()): string {
-  const time = now.toLocaleTimeString("en-GB", {
+// User-facing draft header. This intentionally reports the last observed
+// agent activity, not merely the current clock time. A ticking "now" timestamp
+// is noise; the useful signal is whether the agent/log stream has moved.
+export function formatDraftHeader(now: Date = new Date(), lastActivityAt?: number): string {
+  if (lastActivityAt === undefined || !Number.isFinite(lastActivityAt)) {
+    return "Working…";
+  }
+  const ageSeconds = Math.max(0, Math.floor((now.getTime() - lastActivityAt) / 1000));
+  const lastTime = new Date(lastActivityAt).toLocaleTimeString("en-GB", {
     timeZone: "Europe/Bratislava",
     hour12: false,
   });
-  return `Working… · ${time}`;
+  return `Working… · last activity ${lastTime} (${formatActivityAge(ageSeconds)})`;
 }
+
+function formatActivityAge(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds}s ago`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    const remSec = seconds % 60;
+    return remSec > 0 ? `${minutes}m ${remSec}s ago` : `${minutes}m ago`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remMin = minutes % 60;
+  return remMin > 0 ? `${hours}h ${remMin}m ago` : `${hours}h ago`;
+}
+
+const DRAFT_HEADER_REFRESH_INTERVAL_MS = 30_000;
 
 const DISCORD_TYPING_MAX_DURATION_MS = 20 * 60_000;
 let replyRuntimePromise: Promise<typeof import("openclaw/plugin-sdk/reply-runtime")> | undefined;
@@ -646,19 +666,65 @@ export async function processDiscordMessage(
     Boolean(draftStream) && resolveChannelStreamingPreviewToolProgress(discordConfig);
   let previewToolProgressSuppressed = false;
   let previewToolProgressLines: string[] = [];
+  let lastActivityAt = Date.now();
+  const bumpActivity = () => {
+    lastActivityAt = Date.now();
+  };
+  let headerRefreshInterval: ReturnType<typeof setInterval> | undefined;
+  const refreshDraftHeader = () => {
+    if (!draftStream) {
+      return;
+    }
+    // Once real response text has started streaming, the agent owns the draft
+    // body — don't overwrite it with a header.
+    if (previewToolProgressSuppressed) {
+      return;
+    }
+    const headerText = formatDraftHeader(new Date(), lastActivityAt);
+    const updated =
+      previewToolProgressLines.length > 0
+        ? [headerText, ...previewToolProgressLines.map((entry) => `• ${entry}`)].join("\n")
+        : headerText;
+    if (updated === draftText) {
+      return;
+    }
+    lastPartialText = updated;
+    draftText = updated;
+    draftStream.update(updated);
+  };
+  const startHeaderRefreshTimer = () => {
+    if (!draftStream || headerRefreshInterval) {
+      return;
+    }
+    headerRefreshInterval = setInterval(refreshDraftHeader, DRAFT_HEADER_REFRESH_INTERVAL_MS);
+    // Don't keep the process alive just for the heartbeat tick.
+    headerRefreshInterval.unref?.();
+  };
+  const stopHeaderRefreshTimer = () => {
+    if (headerRefreshInterval) {
+      clearInterval(headerRefreshInterval);
+      headerRefreshInterval = undefined;
+    }
+  };
 
   const sendInitialDraftAck = async () => {
     if (!draftStream) {
       return;
     }
-    const ackText = formatDraftHeader();
+    bumpActivity();
+    const ackText = formatDraftHeader(new Date(), lastActivityAt);
     lastPartialText = ackText;
     draftText = ackText;
     draftStream.update(ackText);
     await draftStream.flush();
+    startHeaderRefreshTimer();
   };
 
   const pushPreviewToolProgress = (line?: string) => {
+    // The agent did *something* — bump activity even if we end up not
+    // displaying this particular line (suppressed, deduped, empty). The
+    // header refresh tick uses this to render "last activity Xm ago".
+    bumpActivity();
     if (!draftStream || !previewToolProgressEnabled || previewToolProgressSuppressed) {
       return;
     }
@@ -672,7 +738,7 @@ export async function processDiscordMessage(
     }
     previewToolProgressLines = [...previewToolProgressLines, normalized].slice(-8);
     const previewText = [
-      formatDraftHeader(),
+      formatDraftHeader(new Date(), lastActivityAt),
       ...previewToolProgressLines.map((entry) => `• ${entry}`),
     ].join("\n");
     lastPartialText = previewText;
@@ -720,6 +786,9 @@ export async function processDiscordMessage(
     if (!draftStream || !text) {
       return;
     }
+    // Any partial chunk — even one we end up dropping — is evidence the agent
+    // is alive; bump activity before any early returns.
+    bumpActivity();
     // Strip reasoning/thinking tags that may leak through the stream.
     const cleaned = stripInlineDirectiveTagsForDelivery(
       stripReasoningTagsFromText(text, { mode: "strict", trim: "both" }),
@@ -980,6 +1049,7 @@ export async function processDiscordMessage(
         onPartialReply: draftStream ? (payload) => updateDraftFromPartial(payload.text) : undefined,
         onAssistantMessageStart: draftStream
           ? () => {
+              bumpActivity();
               if (shouldSplitPreviewMessages && hasStreamedMessage) {
                 logVerbose("discord: calling forceNewMessage() for draft stream");
                 draftStream.forceNewMessage();
@@ -993,6 +1063,7 @@ export async function processDiscordMessage(
           : undefined,
         onReasoningEnd: draftStream
           ? () => {
+              bumpActivity();
               if (shouldSplitPreviewMessages && hasStreamedMessage) {
                 logVerbose("discord: calling forceNewMessage() for draft stream");
                 draftStream.forceNewMessage();
@@ -1086,6 +1157,7 @@ export async function processDiscordMessage(
     dispatchError = true;
     throw err;
   } finally {
+    stopHeaderRefreshTimer();
     try {
       if (!draftFinalDeliveryHandled) {
         await draftStream?.discardPending();

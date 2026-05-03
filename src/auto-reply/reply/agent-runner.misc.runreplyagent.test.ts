@@ -134,7 +134,8 @@ import { runReplyAgent } from "./agent-runner.js";
 type RunWithModelFallbackParams = {
   provider: string;
   model: string;
-  run: (provider: string, model: string) => Promise<unknown>;
+  passAttemptContext?: boolean;
+  run: (provider: string, model: string, options?: unknown) => Promise<unknown>;
 };
 
 beforeEach(() => {
@@ -1538,6 +1539,54 @@ describe("runReplyAgent claude-cli routing", () => {
     expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
     expect(runCliAgentMock).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({ text: "ok" });
+  });
+
+  it("injects a fallback handoff instruction before a fallback CLI model continues", async () => {
+    runWithModelFallbackMock.mockImplementationOnce(
+      async ({ run, passAttemptContext }: RunWithModelFallbackParams) => ({
+        result: await run("google-gemini-cli", "gemini-2.5-pro", {
+          previousAttempts: [
+            {
+              provider: "claude-cli",
+              model: "opus-4.5",
+              reason: "timeout",
+              status: 408,
+              error: "Claude CLI no-output timeout",
+            },
+          ],
+          selectedProvider: "claude-cli",
+          selectedModel: "opus-4.5",
+        }),
+        provider: "google-gemini-cli",
+        model: "gemini-2.5-pro",
+        attempts: [],
+        passAttemptContext,
+      }),
+    );
+    runCliAgentMock.mockResolvedValueOnce({
+      payloads: [{ text: "fallback plan" }],
+      meta: {
+        agentMeta: {
+          provider: "openai-codex",
+          model: "gpt-5.5",
+        },
+      },
+    });
+
+    const result = await createRun();
+
+    expect(runWithModelFallbackMock.mock.calls[0]?.[0]?.passAttemptContext).toBe(true);
+    expect(runCliAgentMock).toHaveBeenCalledTimes(1);
+    expect(runCliAgentMock.mock.calls[0]?.[0]).toMatchObject({
+      provider: "google-gemini-cli",
+      model: "gemini-2.5-pro",
+    });
+    const extraSystemPrompt = runCliAgentMock.mock.calls[0]?.[0]?.extraSystemPrompt;
+    expect(extraSystemPrompt).toContain("Model fallback handoff:");
+    expect(extraSystemPrompt).toContain("originally selected model was claude-cli/opus-4.5");
+    expect(extraSystemPrompt).toContain("fallback model google-gemini-cli/gemini-2.5-pro");
+    expect(extraSystemPrompt).toContain("failed: timeout HTTP 408");
+    expect(result).toMatchObject({ text: "fallback plan" });
   });
 });
 
