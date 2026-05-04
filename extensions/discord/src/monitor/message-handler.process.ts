@@ -89,33 +89,16 @@ function sleep(ms: number): Promise<void> {
 // User-facing draft header. This intentionally reports the last observed
 // agent activity, not merely the current clock time. A ticking "now" timestamp
 // is noise; the useful signal is whether the agent/log stream has moved.
-export function formatDraftHeader(now: Date = new Date(), lastActivityAt?: number): string {
+export function formatDraftHeader(_now: Date = new Date(), lastActivityAt?: number): string {
   if (lastActivityAt === undefined || !Number.isFinite(lastActivityAt)) {
     return "Working…";
   }
-  const ageSeconds = Math.max(0, Math.floor((now.getTime() - lastActivityAt) / 1000));
   const lastTime = new Date(lastActivityAt).toLocaleTimeString("en-GB", {
     timeZone: "Europe/Bratislava",
     hour12: false,
   });
-  return `Working… · last activity ${lastTime} (${formatActivityAge(ageSeconds)})`;
+  return `Working… · last activity ${lastTime}`;
 }
-
-function formatActivityAge(seconds: number): string {
-  if (seconds < 60) {
-    return `${seconds}s ago`;
-  }
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) {
-    const remSec = seconds % 60;
-    return remSec > 0 ? `${minutes}m ${remSec}s ago` : `${minutes}m ago`;
-  }
-  const hours = Math.floor(minutes / 60);
-  const remMin = minutes % 60;
-  return remMin > 0 ? `${hours}h ${remMin}m ago` : `${hours}h ago`;
-}
-
-const DRAFT_HEADER_REFRESH_INTERVAL_MS = 30_000;
 
 const DISCORD_TYPING_MAX_DURATION_MS = 20 * 60_000;
 let replyRuntimePromise: Promise<typeof import("openclaw/plugin-sdk/reply-runtime")> | undefined;
@@ -670,43 +653,6 @@ export async function processDiscordMessage(
   const bumpActivity = () => {
     lastActivityAt = Date.now();
   };
-  let headerRefreshInterval: ReturnType<typeof setInterval> | undefined;
-  const refreshDraftHeader = () => {
-    if (!draftStream) {
-      return;
-    }
-    // Once real response text has started streaming, the agent owns the draft
-    // body — don't overwrite it with a header.
-    if (previewToolProgressSuppressed) {
-      return;
-    }
-    const headerText = formatDraftHeader(new Date(), lastActivityAt);
-    const updated =
-      previewToolProgressLines.length > 0
-        ? [headerText, ...previewToolProgressLines.map((entry) => `• ${entry}`)].join("\n")
-        : headerText;
-    if (updated === draftText) {
-      return;
-    }
-    lastPartialText = updated;
-    draftText = updated;
-    draftStream.update(updated);
-  };
-  const startHeaderRefreshTimer = () => {
-    if (!draftStream || headerRefreshInterval) {
-      return;
-    }
-    headerRefreshInterval = setInterval(refreshDraftHeader, DRAFT_HEADER_REFRESH_INTERVAL_MS);
-    // Don't keep the process alive just for the heartbeat tick.
-    headerRefreshInterval.unref?.();
-  };
-  const stopHeaderRefreshTimer = () => {
-    if (headerRefreshInterval) {
-      clearInterval(headerRefreshInterval);
-      headerRefreshInterval = undefined;
-    }
-  };
-
   const sendInitialDraftAck = async () => {
     if (!draftStream) {
       return;
@@ -717,13 +663,12 @@ export async function processDiscordMessage(
     draftText = ackText;
     draftStream.update(ackText);
     await draftStream.flush();
-    startHeaderRefreshTimer();
   };
 
   const pushPreviewToolProgress = (line?: string) => {
     // The agent did *something* — bump activity even if we end up not
-    // displaying this particular line (suppressed, deduped, empty). The
-    // header refresh tick uses this to render "last activity Xm ago".
+    // displaying this particular line (suppressed, deduped, empty). We only
+    // edit the draft when a real activity signal arrives; no timer ticks.
     bumpActivity();
     if (!draftStream || !previewToolProgressEnabled || previewToolProgressSuppressed) {
       return;
@@ -1157,7 +1102,6 @@ export async function processDiscordMessage(
     dispatchError = true;
     throw err;
   } finally {
-    stopHeaderRefreshTimer();
     try {
       if (!draftFinalDeliveryHandled) {
         await draftStream?.discardPending();

@@ -2,7 +2,7 @@ import { DEFAULT_EMOJIS } from "openclaw/plugin-sdk/channel-feedback";
 import type { ReplyPayload } from "openclaw/plugin-sdk/reply-dispatch-runtime";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const WORKING_HEADER_RE = /^Working… · last activity \d{2}:\d{2}:\d{2} \(\d+s ago\)$/;
+const WORKING_HEADER_RE = /^Working… · last activity \d{2}:\d{2}:\d{2}$/;
 
 const sendMocks = vi.hoisted(() => ({
   reactMessageDiscord: vi.fn<
@@ -963,9 +963,7 @@ describe("processDiscordMessage draft streaming", () => {
     const updates = draftStream.update.mock.calls.map((call) => call[0]);
     expect(updates).toHaveLength(2);
     expect(updates[0]).toMatch(WORKING_HEADER_RE);
-    expect(updates[1]).toMatch(
-      /^Working… · last activity \d{2}:\d{2}:\d{2} \(\d+s ago\)\n• tool: read$/,
-    );
+    expect(updates[1]).toMatch(/^Working… · last activity \d{2}:\d{2}:\d{2}\n• tool: read$/);
     expect(
       dispatchInboundMessage.mock.calls[0]?.[0]?.replyOptions?.suppressDefaultToolProgressMessages,
     ).toBe(true);
@@ -986,10 +984,10 @@ describe("processDiscordMessage draft streaming", () => {
     expect(updates).toHaveLength(3);
     expect(updates[0]).toMatch(WORKING_HEADER_RE);
     expect(updates[1]).toMatch(
-      /^Working… · last activity \d{2}:\d{2}:\d{2} \(\d+s ago\)\n• Compacting context — back in a moment\.$/,
+      /^Working… · last activity \d{2}:\d{2}:\d{2}\n• Compacting context — back in a moment\.$/,
     );
     expect(updates[2]).toMatch(
-      /^Working… · last activity \d{2}:\d{2}:\d{2} \(\d+s ago\)\n• Compacting context — back in a moment\.\n• Compaction finished; resuming\.$/,
+      /^Working… · last activity \d{2}:\d{2}:\d{2}\n• Compacting context — back in a moment\.\n• Compaction finished; resuming\.$/,
     );
   });
 
@@ -1060,32 +1058,14 @@ describe("formatDraftHeader", () => {
   it("always shows last observed activity instead of a current-time-only timestamp", async () => {
     const { formatDraftHeader } = await import("./message-handler.process.js");
     const now = new Date("2026-04-29T07:30:45Z");
-    expect(formatDraftHeader(now, now.getTime() - 1_000)).toBe(
-      "Working… · last activity 09:30:44 (1s ago)",
-    );
+    expect(formatDraftHeader(now, now.getTime() - 1_000)).toBe("Working… · last activity 09:30:44");
   });
 
   it("appends last-activity suffix in seconds when activity is stale", async () => {
     const { formatDraftHeader } = await import("./message-handler.process.js");
     const now = new Date("2026-04-29T07:30:45Z");
     expect(formatDraftHeader(now, now.getTime() - 42_000)).toBe(
-      "Working… · last activity 09:30:03 (42s ago)",
-    );
-  });
-
-  it("appends last-activity suffix in minutes when activity is older", async () => {
-    const { formatDraftHeader } = await import("./message-handler.process.js");
-    const now = new Date("2026-04-29T07:32:45Z");
-    expect(formatDraftHeader(now, now.getTime() - 130_000)).toBe(
-      "Working… · last activity 09:30:35 (2m 10s ago)",
-    );
-  });
-
-  it("appends last-activity suffix in hours+minutes for very stale activity", async () => {
-    const { formatDraftHeader } = await import("./message-handler.process.js");
-    const now = new Date("2026-04-29T08:30:45Z");
-    expect(formatDraftHeader(now, now.getTime() - (60 * 60 + 5 * 60) * 1_000)).toBe(
-      "Working… · last activity 09:25:45 (1h 5m ago)",
+      "Working… · last activity 09:30:03",
     );
   });
 });

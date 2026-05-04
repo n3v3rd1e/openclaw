@@ -361,6 +361,14 @@ export async function executePreparedCliRun(
                 },
               });
             },
+            onActivity: (evt) => {
+              emitAgentEvent({
+                runId: params.runId,
+                stream: evt.stream,
+                data: evt.data,
+              });
+              void params.onAgentActivity?.(evt);
+            },
             cleanup: claudeSkillsPlugin.cleanup,
           });
           const rawText = liveResult.output.text;

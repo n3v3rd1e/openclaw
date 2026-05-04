@@ -1006,6 +1006,25 @@ export async function runAgentTurnWithFallback(params: {
                   senderIsOwner: params.followupRun.run.senderIsOwner,
                   abortSignal: params.replyOperation?.abortSignal ?? params.opts?.abortSignal,
                   replyOperation: params.replyOperation,
+                  onAgentActivity: async (evt) => {
+                    if (evt.stream === "tool") {
+                      await params.opts?.onToolStart?.({
+                        name: normalizeOptionalString(evt.data.name),
+                        phase: normalizeOptionalString(evt.data.phase) ?? "start",
+                      });
+                      return;
+                    }
+                    await params.opts?.onItemEvent?.({
+                      itemId: normalizeOptionalString(evt.data.itemId),
+                      kind: normalizeOptionalString(evt.data.kind),
+                      title: normalizeOptionalString(evt.data.title),
+                      name: normalizeOptionalString(evt.data.name),
+                      phase: normalizeOptionalString(evt.data.phase),
+                      status: normalizeOptionalString(evt.data.status),
+                      summary: normalizeOptionalString(evt.data.summary),
+                      progressText: normalizeOptionalString(evt.data.progressText),
+                    });
+                  },
                 });
                 bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
                   result.meta?.systemPromptReport,

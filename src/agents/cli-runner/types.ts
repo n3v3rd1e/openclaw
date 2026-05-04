@@ -43,6 +43,11 @@ export type RunCliAgentParams = {
   senderIsOwner?: boolean;
   abortSignal?: AbortSignal;
   replyOperation?: ReplyOperation;
+  /** Activity surfaced from CLI JSONL streams (tool calls, item progress, etc.). */
+  onAgentActivity?: (evt: {
+    stream: "tool" | "item";
+    data: Record<string, unknown>;
+  }) => Promise<void> | void;
 };
 
 export type CliPreparedBackend = {

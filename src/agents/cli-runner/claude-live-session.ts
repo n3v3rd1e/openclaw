@@ -18,6 +18,8 @@ type ProcessSupervisor = ReturnType<
   typeof import("../../process/supervisor/index.js").getProcessSupervisor
 >;
 type ManagedRun = Awaited<ReturnType<ProcessSupervisor["spawn"]>>;
+type ClaudeLiveActivity = { stream: "tool" | "item"; data: Record<string, unknown> };
+
 type ClaudeLiveTurn = {
   backend: CliBackendConfig;
   startedAtMs: number;
@@ -27,6 +29,7 @@ type ClaudeLiveTurn = {
   noOutputTimer: NodeJS.Timeout | null;
   timeoutTimer: NodeJS.Timeout | null;
   streamingParser: ReturnType<typeof createCliJsonlStreamingParser>;
+  onActivity?: (evt: ClaudeLiveActivity) => void | Promise<void>;
   resolve: (output: CliOutput) => void;
   reject: (error: unknown) => void;
 };
@@ -412,17 +415,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function parseClaudeLiveJsonLine(
-  session: ClaudeLiveSession,
+  _session: ClaudeLiveSession,
   trimmed: string,
 ): Record<string, unknown> | null {
-  if (trimmed.length > CLAUDE_LIVE_MAX_STDOUT_BUFFER_CHARS) {
-    closeLiveSession(
-      session,
-      "abort",
-      createOutputLimitError(session, "Claude CLI JSONL line exceeded output limit."),
-    );
-    return null;
-  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(trimmed);
@@ -430,6 +425,70 @@ function parseClaudeLiveJsonLine(
     return null;
   }
   return isRecord(parsed) ? parsed : null;
+}
+
+function trimTurnRawWindow(turn: ClaudeLiveTurn): void {
+  while (
+    (turn.rawChars > CLAUDE_LIVE_MAX_TURN_RAW_CHARS ||
+      turn.rawLines.length > CLAUDE_LIVE_MAX_TURN_LINES) &&
+    turn.rawLines.length > 1
+  ) {
+    const removed = turn.rawLines.shift();
+    if (removed) {
+      turn.rawChars = Math.max(0, turn.rawChars - removed.length - 1);
+    }
+  }
+}
+
+function collectClaudeToolUses(
+  value: unknown,
+  out: Array<{ id?: string; name: string }> = [],
+): Array<{ id?: string; name: string }> {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectClaudeToolUses(item, out);
+    }
+    return out;
+  }
+  if (!isRecord(value)) {
+    return out;
+  }
+  if (value.type === "tool_use" && typeof value.name === "string" && value.name.trim()) {
+    out.push({
+      id: typeof value.id === "string" && value.id.trim() ? value.id.trim() : undefined,
+      name: value.name.trim(),
+    });
+  }
+  for (const nested of Object.values(value)) {
+    if (nested && typeof nested === "object") {
+      collectClaudeToolUses(nested, out);
+    }
+  }
+  return out;
+}
+
+function emitClaudeLiveActivity(session: ClaudeLiveSession, parsed: Record<string, unknown>): void {
+  const turn = session.currentTurn;
+  if (!turn?.onActivity) {
+    return;
+  }
+  const toolUses = collectClaudeToolUses(parsed);
+  const seen = new Set<string>();
+  for (const tool of toolUses) {
+    const key = `${tool.id ?? ""}:${tool.name}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    void turn.onActivity({
+      stream: "tool",
+      data: {
+        phase: "start",
+        name: tool.name,
+        ...(tool.id ? { toolCallId: tool.id } : {}),
+      },
+    });
+  }
 }
 
 function createResultError(
@@ -474,19 +533,10 @@ function handleClaudeLiveLine(session: ClaudeLiveSession, line: string): void {
   if (!turn) {
     return;
   }
-  turn.rawChars += trimmed.length + 1;
-  if (
-    turn.rawChars > CLAUDE_LIVE_MAX_TURN_RAW_CHARS ||
-    turn.rawLines.length >= CLAUDE_LIVE_MAX_TURN_LINES
-  ) {
-    closeLiveSession(
-      session,
-      "abort",
-      createOutputLimitError(session, "Claude CLI turn output exceeded limit."),
-    );
-    return;
-  }
   turn.rawLines.push(trimmed);
+  turn.rawChars += trimmed.length + 1;
+  trimTurnRawWindow(turn);
+  emitClaudeLiveActivity(session, parsed);
   turn.streamingParser.push(`${trimmed}\n`);
   turn.sessionId = parseSessionId(parsed) ?? turn.sessionId;
   if (parsed.type !== "result") {
@@ -685,6 +735,7 @@ function createTurn(params: {
   context: PreparedCliRunContext;
   noOutputTimeoutMs: number;
   onAssistantDelta: (delta: CliStreamingDelta) => void;
+  onActivity?: (evt: ClaudeLiveActivity) => void | Promise<void>;
   session: ClaudeLiveSession;
   resolve: (output: CliOutput) => void;
   reject: (error: unknown) => void;
@@ -701,6 +752,7 @@ function createTurn(params: {
       providerId: params.context.backendResolved.id,
       onAssistantDelta: params.onAssistantDelta,
     }),
+    onActivity: params.onActivity,
     resolve: params.resolve,
     reject: params.reject,
   };
@@ -765,6 +817,7 @@ export async function runClaudeLiveSessionTurn(params: {
   noOutputTimeoutMs: number;
   getProcessSupervisor: () => ProcessSupervisor;
   onAssistantDelta: (delta: CliStreamingDelta) => void;
+  onActivity?: (evt: ClaudeLiveActivity) => void | Promise<void>;
   cleanup: () => Promise<void>;
 }): Promise<ClaudeLiveRunResult> {
   const key = buildClaudeLiveKey(params.context);
@@ -876,6 +929,7 @@ export async function runClaudeLiveSessionTurn(params: {
       context: params.context,
       noOutputTimeoutMs: params.noOutputTimeoutMs,
       onAssistantDelta: params.onAssistantDelta,
+      onActivity: params.onActivity,
       session: liveSession,
       resolve,
       reject,
@@ -913,3 +967,12 @@ export async function runClaudeLiveSessionTurn(params: {
     }
   }
 }
+
+export const __testing = {
+  collectClaudeToolUses,
+  trimTurnRawWindow,
+  limits: {
+    maxTurnRawChars: CLAUDE_LIVE_MAX_TURN_RAW_CHARS,
+    maxTurnLines: CLAUDE_LIVE_MAX_TURN_LINES,
+  },
+};
